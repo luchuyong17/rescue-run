@@ -1,0 +1,2465 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>救援行動</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --panel: rgba(36,30,28,.84);
+  --panel-edge: rgba(243,233,216,.16);
+  --ink:#f3e9d8; --ink-dim:#bdb09e; --accent:#e8b04a; --ok:#9cc46f; --bad:#e0664b;
+  --bg:#3a3450;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){ --bg:#2e2a42; } }
+:root[data-theme="dark"]{ --bg:#2e2a42; }
+html{scroll-padding-top:env(safe-area-inset-top,0px);}
+*,*::before,*::after{box-sizing:border-box;}
+[hidden]{display:none !important;}
+html,body{height:100%;margin:0;}
+body{
+  background:var(--bg);
+  background-image:linear-gradient(180deg,#34304b 0%,#5e4a63 38%,#a8706a 72%,#dfa06c 100%);
+  color:var(--ink);
+  font-family:"Noto Sans TC",system-ui,-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;
+  overflow:hidden; -webkit-user-select:none; user-select:none; touch-action:none;
+}
+#stage{position:fixed;inset:0;}
+canvas{display:block;}
+button{font:inherit;color:inherit;}
+button:focus-visible,input:focus-visible+span{outline:2px solid var(--accent);outline-offset:2px;}
+
+.hud{position:fixed;z-index:5;background:var(--panel);border:1px solid var(--panel-edge);border-radius:12px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);}
+.hud-left{top:calc(env(safe-area-inset-top,0px) + 12px);left:12px;width:min(290px,calc(100vw - 24px));padding:12px 14px;}
+.mission{font-weight:500;font-size:15px;line-height:1.45;margin-bottom:10px;}
+.row{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--ink-dim);margin-top:6px;}
+.row .lbl{width:4.6em;flex:none;}
+.row strong{color:var(--ink);font-weight:500;}
+.bars{display:flex;align-items:flex-end;gap:3px;height:16px;}
+.bars i{display:block;width:6px;background:rgba(243,233,216,.18);border-radius:2px;}
+.bars i:nth-child(1){height:4px}.bars i:nth-child(2){height:7px}.bars i:nth-child(3){height:10px}.bars i:nth-child(4){height:13px}.bars i:nth-child(5){height:16px}
+.bars i.on{background:var(--accent);}
+.meter{flex:1;height:8px;border-radius:4px;background:rgba(243,233,216,.14);overflow:hidden;}
+.meter b{display:block;height:100%;width:100%;background:var(--ok);transition:width .2s linear,background .3s;}
+
+.hud-right{top:calc(env(safe-area-inset-top,0px) + 12px);right:12px;padding:8px;display:flex;flex-direction:column;gap:6px;}
+.tog{display:flex;align-items:center;gap:10px;min-width:138px;padding:7px 10px;background:rgba(243,233,216,.05);border:1px solid rgba(243,233,216,.12);border-radius:8px;font-size:14px;cursor:pointer;text-align:left;}
+.tog span{flex:1;}
+.tog em{font-style:normal;font-size:12px;color:var(--ink-dim);}
+.tog kbd{font-family:inherit;font-size:11px;color:var(--ink-dim);border:1px solid rgba(243,233,216,.2);border-radius:4px;padding:0 5px;}
+.tog.on{border-color:var(--accent);background:rgba(232,176,74,.18);}
+.tog.on em{color:var(--accent);}
+.tog.dim{opacity:.45;}
+
+.garage{bottom:calc(env(safe-area-inset-bottom,0px) + 14px);left:12px;width:min(330px,calc(100vw - 24px));padding:14px 16px;}
+.garage h2{margin:0 0 4px;font-size:16px;font-weight:700;}
+.garage p{margin:0 0 10px;font-size:12.5px;line-height:1.55;color:var(--ink-dim);}
+.mod{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid rgba(243,233,216,.1);cursor:pointer;}
+.mod input{margin-top:3px;accent-color:var(--accent);width:16px;height:16px;flex:none;}
+.mod strong{display:block;font-size:14px;font-weight:500;}
+.mod small{display:block;font-size:12px;line-height:1.5;color:var(--ink-dim);margin-top:2px;}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid rgba(243,233,216,.1);}
+.stats div{font-size:11.5px;color:var(--ink-dim);}
+.stats b{display:block;font-size:15px;color:var(--ink);font-weight:500;margin-top:2px;}
+
+.toast{position:fixed;left:50%;top:26%;transform:translate(-50%,6px);z-index:6;background:var(--panel);border:1px solid var(--panel-edge);border-radius:10px;padding:9px 16px;font-size:15px;opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;white-space:normal;max-width:calc(100vw - 32px);width:max-content;text-align:center;line-height:1.4;}   /* 長句在手機上換行，不超出螢幕 */
+.toast.show{opacity:1;transform:translate(-50%,0);}
+
+.keys{position:fixed;bottom:calc(env(safe-area-inset-bottom,0px) + 14px);left:50%;transform:translateX(-50%);z-index:4;font-size:12px;color:rgba(243,233,216,.72);background:rgba(36,30,28,.5);padding:6px 12px;border-radius:8px;white-space:nowrap;}
+
+.radio-sub{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 46px);transform:translateX(-50%);z-index:20;width:min(680px,calc(100vw - 24px));text-align:center;background:rgba(18,14,12,.92);border:1px solid rgba(243,233,216,.28);border-radius:12px;padding:10px 18px 12px;pointer-events:none;transition:opacity .3s;box-shadow:0 4px 18px rgba(0,0,0,.45);}
+.radio-sub small{display:block;font-size:11px;letter-spacing:.12em;color:var(--ink-dim);margin-bottom:3px;}
+.radio-sub span{font-size:clamp(20px,3.2vw,28px);line-height:1.5;letter-spacing:.06em;font-weight:700;color:#fff6e4;}
+.seg{display:flex;gap:4px;flex:1;}
+.seg button{flex:1;padding:3px 0;font-size:12px;background:rgba(243,233,216,.06);border:1px solid rgba(243,233,216,.14);border-radius:6px;cursor:pointer;}
+.seg button.on{background:rgba(232,176,74,.22);border-color:var(--accent);color:var(--accent);}
+.compass{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 12px);transform:translateX(-50%);z-index:6;width:min(520px,calc(100vw - 660px));height:48px;pointer-events:none;}
+@media (max-width:1180px){.compass{width:min(520px,calc(100vw - 24px));top:calc(env(safe-area-inset-top,0px) + 196px);}}
+.tog .chip{display:block;width:12px;height:12px;border-radius:50%;flex:none;border:1px solid rgba(255,255,255,.45);}
+.clock{font-size:13px;font-weight:700;color:var(--ink);letter-spacing:.04em;margin-bottom:6px;}
+.tstats{display:grid;grid-template-columns:1fr 1fr;gap:8px 14px;margin:6px 0 10px;}
+.tstats div{font-size:13px;color:var(--ink-dim);}
+.tstats b{display:block;font-size:20px;color:var(--ink);font-weight:700;margin-top:2px;}
+.meter.big{height:12px;margin-bottom:8px;}
+.go.alt{background:rgba(243,233,216,.12);color:var(--ink);border:1px solid var(--panel-edge);}
+.go[disabled]{opacity:.45;cursor:default;}
+.reslist{list-style:none;margin:6px 0 10px;padding:0;font-size:14px;}
+.reslist li{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid rgba(243,233,216,.08);}
+.reslist li b{font-weight:700;}
+.reslist li.total{border-bottom:0;font-size:17px;padding-top:8px;}
+.sharetxt{white-space:pre-wrap;font:13px/1.6 inherit;font-family:inherit;background:rgba(243,233,216,.06);border-radius:10px;padding:10px 12px;margin:4px 0 14px;user-select:text;-webkit-user-select:text;}
+#final .go.alt{margin-top:8px;}
+#passRow .meter{height:12px;}
+#passRow .lbl{font-weight:700;color:var(--ink);}
+.seg3{display:flex;gap:8px;margin:4px 0 8px;}
+.seg3 button{flex:1;padding:12px 4px;font-size:16px;font-weight:700;border-radius:10px;background:rgba(243,233,216,.08);border:1px solid var(--panel-edge);cursor:pointer;}
+.seg3 button.on{background:var(--accent);color:#2a2018;border-color:var(--accent);}
+.touch{display:none;}
+.tpad{position:fixed;bottom:calc(env(safe-area-inset-bottom,0px) + 16px);z-index:5;display:flex;gap:10px;}
+.tpad.l{left:14px;}
+.tpad.r{right:14px;flex-direction:column;}
+.tpad button{width:68px;height:62px;border-radius:14px;background:var(--panel);border:1px solid var(--panel-edge);font-size:15px;touch-action:none;}
+.tpad.r button{width:84px;height:54px;}
+.tpad button.held{background:rgba(232,176,74,.3);border-color:var(--accent);}
+.mobonly{display:none;}
+.menuwrap .morerow.mobonly,.menuwrap .sidebtn.mobonly{display:none;}
+.menuwrap{display:contents;}
+#vol{flex:1;min-width:0;accent-color:var(--accent);}
+#volTxt{width:3em;text-align:right;font-size:12px;}
+.gclose{display:block;width:100%;margin-top:10px;padding:9px;border-radius:8px;border:1px solid var(--panel-edge);background:rgba(243,233,216,.08);font-size:14px;}
+@media (pointer:coarse){
+  .keys{display:none;}
+  .touch{display:block;}
+}
+
+/* ===== 手機版面（窄螢幕或觸控）：上方方位帶＋細列，右側中間功能鍵，下方左右按鈕，字幕在按鈕上方，中間 50% 留給遊戲畫面 ===== */
+@media (max-width:640px),(pointer:coarse){
+  .mobonly{display:block;}
+  .compass{width:calc(100vw - 16px);height:40px;top:calc(env(safe-area-inset-top,0px) + 8px);}
+  .hud-left{top:calc(env(safe-area-inset-top,0px) + 54px);left:8px;right:8px;width:auto;padding:5px 10px;display:flex;align-items:center;gap:10px;flex-wrap:nowrap;}
+  .hud-left .mission{flex:1;min-width:0;margin:0;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .hud-left .row{margin:0;font-size:12px;gap:6px;flex:none;}
+  .hud-left .row .lbl{width:auto;}
+  .hud-left #passRow .meter{width:60px;flex:none;}
+  .hud-left .surfrow{display:none;}
+  .menuwrap{display:none;}
+  .menuwrap.open{display:block;position:fixed;top:calc(env(safe-area-inset-top,0px) + 92px);right:8px;z-index:30;background:var(--panel);border:1px solid var(--panel-edge);border-radius:10px;padding:6px 12px 10px;width:min(320px,calc(100vw - 16px));}
+  .menuwrap .row{margin-top:8px;}
+  .menuwrap .morerow.mobonly{display:flex;flex-wrap:wrap;gap:6px;}
+  .menuwrap .sidebtn.mobonly{display:flex;}
+  .menuwrap .morerow .tog{padding:6px 10px;font-size:13px;}
+  #menuBtn{padding:2px 9px;border-radius:8px;border:1px solid rgba(243,233,216,.2);background:rgba(243,233,216,.06);font-size:16px;line-height:1.2;flex:none;}
+  .hud-right{top:50%;bottom:auto;right:6px;transform:translateY(-50%);flex-direction:column;flex-wrap:nowrap;max-width:none;padding:4px;gap:4px;}
+  .tog{min-width:0;padding:6px 7px;font-size:11.5px;gap:4px;justify-content:center;}
+  .tog em,.tog kbd{display:none;}
+  .garage{display:none;}
+  .garage.open{display:block;position:fixed;left:50%;top:50%;bottom:auto;transform:translate(-50%,-50%);width:min(340px,calc(100vw - 24px));max-height:72vh;overflow:auto;z-index:30;}
+  #garageBtn{position:fixed;left:8px;top:calc(env(safe-area-inset-top,0px) + 96px);z-index:6;padding:7px 14px;border-radius:10px;border:1px solid var(--accent);background:rgba(232,176,74,.2);font-size:14px;font-weight:700;}
+  .radio-sub{bottom:calc(env(safe-area-inset-bottom,0px) + 46px);width:calc(100vw - 16px);}
+  .radio-sub span{font-size:20px;}
+}
+/* 單手玩：右下（可換左下）一支虛擬搖桿，推上＝前進、拉下＝倒車、左右＝轉向，推多遠油門多大 */
+.stick{display:none;position:fixed;bottom:calc(env(safe-area-inset-bottom,0px) + 18px);right:18px;width:136px;height:136px;z-index:6;touch-action:none;}
+.stick .base{position:absolute;inset:0;border-radius:50%;background:rgba(36,30,28,.55);border:2px solid rgba(243,233,216,.3);}
+.stick .base::before,.stick .base::after{content:"";position:absolute;background:rgba(243,233,216,.18);}
+.stick .base::before{left:50%;top:14%;bottom:14%;width:2px;}
+.stick .base::after{top:50%;left:14%;right:14%;height:2px;}
+.stick .knob{position:absolute;left:50%;top:50%;width:58px;height:58px;margin:-29px 0 0 -29px;border-radius:50%;background:rgba(232,176,74,.8);border:2px solid #f3e9d8;pointer-events:none;}
+
+.overlay{position:fixed;inset:0;z-index:10;display:grid;place-items:center;background:rgba(28,22,30,.5);padding:20px;}
+.overlay[hidden]{display:none;}
+.card{max-width:440px;width:100%;background:var(--panel);border:1px solid var(--panel-edge);border-radius:14px;padding:24px 24px 20px;}
+.card h1{margin:0 0 10px;font-size:26px;font-weight:700;letter-spacing:.02em;}
+.introcard.briefcard{min-height:0;}.briefcard .introtxt{flex:none;padding-top:6px;margin-bottom:26px;}   /* 提醒卡片：高度跟著內容，不用撐到開場那麼高 */
+.introcard{min-height:480px;display:flex;flex-direction:column;}   /* 開場卡片：維持原本的大小，文字少了就放大、上下排開，「開始」留在底部 */
+.card.introcard h1{font-size:30px;margin-bottom:18px;}
+.introtxt{flex:1;display:flex;flex-direction:column;justify-content:flex-start;padding-top:44px;gap:18px;}   /* 標題下空約兩行（Lu：原本置中空太多，縮一排） */
+.introcard .introtxt p{margin:0;font-size:18px;line-height:1.65;}
+.card h2{margin:0 0 8px;font-size:22px;font-weight:700;}
+.card p{margin:0 0 12px;font-size:14.5px;line-height:1.7;color:var(--ink);}
+.card .dim{color:var(--ink-dim);font-size:13px;}
+.card dl{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;margin:4px 0 16px;font-size:13px;}
+.card dt{color:var(--accent);font-weight:500;}
+.card dd{margin:0;color:var(--ink-dim);}
+.go{display:block;width:100%;margin-top:8px;padding:12px;border:0;border-radius:10px;background:var(--accent);color:#2a2018;font-size:16px;font-weight:700;cursor:pointer;}
+.go:hover{filter:brightness(1.06);}
+
+/* ===== 手機第二版：單列頂欄、字幕有話才出現、功能鍵圍在搖桿上緣、浮動搖桿，把車前方的畫面空出來 ===== */
+@media (max-width:640px),(pointer:coarse){
+  .compass{left:80px;right:auto;width:calc(100vw - 160px);max-width:calc(100vw - 160px);transform:none;height:40px;top:calc(env(safe-area-inset-top,0px) + 8px);}   /* 頂部三格：左右都是 64 寬、間距都是 8，方位帶在中間 */
+  .hud-left{-webkit-backdrop-filter:none;backdrop-filter:none;top:calc(env(safe-area-inset-top,0px) + 8px);left:8px;right:auto;width:64px;height:40px;padding:0 6px;display:flex;align-items:center;justify-content:center;border-radius:12px;cursor:pointer;}
+  .hud-left{flex-direction:column;gap:0;}
+  .hud-left .clock{font-size:11px;margin:0;line-height:1.2;}
+  .hud-left #radioRow{margin:0;}
+  .go{padding:15px;font-size:18px;}
+  .hud-left #radioRow .lbl,.hud-left #radioTxt{display:none;}
+  .hud-left #passRow{position:fixed;top:calc(env(safe-area-inset-top,0px) + 54px);left:8px;width:170px;background:var(--panel);border:1px solid var(--panel-edge);border-radius:10px;padding:5px 10px;margin:0;}
+  .hud-left .mission{position:fixed;top:calc(env(safe-area-inset-top,0px) + 54px);left:8px;right:8px;flex:none;background:rgba(36,30,28,.9);border:1px solid var(--panel-edge);border-radius:10px;padding:6px 12px;opacity:0;pointer-events:none;transition:opacity .4s;white-space:normal;z-index:7;font-size:13px;}
+  .hud-left .mission.show{opacity:1;}
+  #menuBtn{position:fixed;top:calc(env(safe-area-inset-top,0px) + 8px);right:8px;color:var(--ink);width:64px;height:40px;padding:0;z-index:7;background:var(--panel);border:1px solid var(--panel-edge);border-radius:12px;}
+  .menuwrap.open{top:calc(env(safe-area-inset-top,0px) + 56px);}
+  #garageBtn{top:28%;left:auto;right:8px;}
+  .radio-sub{top:calc(env(safe-area-inset-top,0px) + 54px);bottom:auto;width:calc(100vw - 16px);padding:5px 12px;background:rgba(18,14,12,.74);border-radius:10px;box-shadow:none;border-color:rgba(243,233,216,.16);}
+  .radio-sub small{display:none;}
+  .radio-sub span{font-size:17px;font-weight:600;line-height:1.35;}
+}
+@media (max-width:640px),(pointer:coarse){
+  body .stickzone{display:block;}   /* 前面加 body：蓋過檔案後面那條預設 display:none（之前就是被它蓋掉，觸發區根本沒出現） */
+  body .stick{display:block;left:50%;right:auto;margin-left:-68px;bottom:calc(env(safe-area-inset-bottom,0px) + 28px);opacity:.32;transition:opacity .2s;pointer-events:none;}
+  .stick.active{opacity:1;}
+  /* 四顆功能鍵：搖桿左右各兩顆（搖桿預設在中下），不蓋到車 */
+  .hud-right{position:fixed;top:auto;transform:none;right:auto;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 96px);width:0;height:0;padding:0;background:none;border:0;-webkit-backdrop-filter:none;backdrop-filter:none;display:block;z-index:8;}
+  .hud-right .tog{position:absolute;top:-23px;width:46px;height:46px;min-width:0;padding:0;border-radius:50%;justify-content:center;font-size:11px;background:rgba(36,30,28,.8);border:1px solid var(--panel-edge);}
+  .hud-right .tog span{flex:none;}
+  .hud-right .tog.on{background:rgba(232,176,74,.6);border-color:var(--accent);color:#fff;}
+  .hud-right .tog:nth-child(1){left:-171px;}
+  .hud-right .tog:nth-child(2){left:-121px;}
+  .hud-right .tog:nth-child(3){left:75px;}
+  .hud-right .tog:nth-child(4){left:125px;}
+  .hud-right .mode{flex-direction:column;gap:2px;}
+  .hud-right .mode .chip{width:9px;height:9px;}
+  .hud-right .mode kbd{display:none;}
+  #tScout{left:-146px;top:-76px;}   /* 和絞盤左右對稱：放在低速檔和洩氣上方 */
+  #tScout em{display:none;}
+  #tTow{position:fixed;top:calc(env(safe-area-inset-top,0px) + 76px);right:8px;left:auto;width:64px;height:40px;border-radius:12px;margin:0;z-index:8;}   /* 圓角方形，和頂部那排一致 */   /* 右上方，離勘查、選單鈕 ≥28 px、離下方的模式鍵很遠，避免誤觸 */
+  #tWinch{left:100px;top:-76px;}   /* 第五顆圓鈕：放在差速鎖和升高上方，樣式和模式鍵一樣 */
+}
+#tTow{margin-top:14px;}   /* 電腦版：和上面的鍵隔開一點，避免誤觸 */
+.stickzone{display:none;position:fixed;left:0;right:0;bottom:0;height:44vh;z-index:5;touch-action:none;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;}
+.stick{-webkit-touch-callout:none;}
+</style>
+</head>
+<body>
+<div id="stage"></div>
+
+<div class="hud hud-left" aria-live="polite">
+  <div class="clock" id="clock">06:00</div>
+  <div class="mission" id="mission">聽無線電，找到發出求救訊號的登山客</div>
+  <div class="row" id="radioRow"><span class="lbl">無線電</span><span class="bars" id="bars"><i></i><i></i><i></i><i></i><i></i></span><span id="radioTxt"></span></div>
+  <div class="row" id="passRow" hidden><span class="lbl">乘客狀況</span><span class="meter"><b id="comfortFill"></b></span><strong id="comfortNum">100</strong></div>
+  <button class="mobonly" id="menuBtn" aria-label="選單">⋯</button>
+  <div class="menuwrap" id="menuWrap">
+  <div class="row diffrow" id="diffRow"><span class="lbl">難度</span><span class="seg"><button id="diff_easy">簡單</button><button id="diff_normal">普通</button><button id="diff_hard">困難</button></span></div>
+    <div class="row volrow"><span class="lbl">無線電音量</span><input type="range" id="vol" min="0" max="100" value="60" aria-label="無線電音量"><span id="volTxt">60%</span></div>
+  <div class="row morerow mobonly" id="moreRow"></div>
+  </div>
+  <div class="row surfrow"><span class="lbl">地表</span><strong id="surfTxt">路面</strong></div>
+</div>
+
+<div class="hud hud-right">
+  <button class="tog mode" id="tRock" data-m="rock"><i class="chip" style="background:#80869a"></i><span>低速檔</span><kbd>1</kbd></button>
+  <button class="tog mode" id="tSand" data-m="sand"><i class="chip" style="background:#eccb78"></i><span>洩氣</span><kbd>2</kbd></button>
+  <button class="tog mode" id="tMud" data-m="mud"><i class="chip" style="background:#4a3222"></i><span>差速鎖</span><kbd>3</kbd></button>
+  <button class="tog mode" id="tRiver" data-m="river"><i class="chip" style="background:#3f8f9c"></i><span>升高</span><kbd>4</kbd></button>
+  <button class="tog mode" id="tScout"><i class="chip" style="background:#9cc46f"></i><span>勘查</span><em></em><kbd>F</kbd></button>
+  <button class="tog mode" id="tWinch"><i class="chip" style="background:#e8b04a"></i><span>絞盤</span><kbd>R</kbd></button>
+  <button class="tog mode" id="tTow" hidden><i class="chip" style="background:#9aa1ab"></i><span>拖車</span><kbd>T</kbd></button>
+</div>
+
+<canvas class="compass" id="compass" width="1040" height="96" aria-label="回家方位帶"></canvas>
+<div class="toast" id="toast"></div>
+<div class="overlay" id="rewind" hidden><div class="card"><h2>剛剛翻車了</h2><p class="dim" id="rewindTxt"></p><button class="go" id="rewindBtn">回到 5 秒前</button></div></div>
+<div class="radio-sub" id="radioSub"><small>無線電</small><span id="radioLine"></span></div>
+<div class="keys">WASD 駕駛　1 低速檔（岩地）　2 洩氣（沙地）　3 差速鎖（泥地）　4 升高（河）　R 絞盤（按住收線＋方向選錨點）　F 勘查　` 除錯標記</div>
+
+<div class="stickzone" id="stickZone"></div>
+<div class="stick" id="stick" aria-label="虛擬搖桿"><div class="base"></div><div class="knob" id="knob"></div></div>
+
+<div class="overlay" id="intro">
+  <div class="card introcard">
+    <h1>救援行動</h1>
+    <div class="introtxt">
+      <p>山裡有人發出求救訊號。</p>
+      <p>沒有地圖、沒有箭頭，<br>聽無線電，往訊號強的地方找。</p>
+      <p>接上車之後開穩一點，<br>平安送回有燈柱的小鎮。</p>
+    </div>
+    <button class="go" id="goBtn">開始</button>
+  </div>
+</div>
+
+<div class="overlay" id="town" hidden>
+  <div class="card">
+    <h2 id="townTitle"></h2>
+    <div class="seg3" id="typeSeg"><button data-t="valley">河谷</button><button data-t="cliff">懸崖路</button><button data-t="hills">丘陵</button></div>
+    <p class="dim" id="townType" hidden></p>   <!-- 地形說明先拿掉（Lu 2026-10-13） -->
+    <div class="tstats">
+      <div>車況<b id="townHealthTxt"></b></div><div>已救<b id="townRescued"></b></div>
+      <div>總分<b id="townScore"></b></div><div>下一趟出發<b id="townTime"></b></div>
+    </div>
+    <div class="meter big"><b id="townHealth"></b></div>
+    <p class="dim" id="townHint"></p>
+    <button class="go" id="departBtn">沙⋯沙沙⋯有人求救⋯</button>
+    <button class="go alt" id="repairBtn">修車</button>
+  </div>
+</div>
+
+<div class="overlay" id="brief" hidden>   <!-- 出發前的提醒卡片：每種地形一兩句（Lu 2026-10-13 定稿） -->
+  <div class="card introcard briefcard">
+    <h1 id="briefTitle"></h1>
+    <div class="introtxt"><p id="briefText"></p></div>
+    <button class="go" id="briefGo">上路</button>
+  </div>
+</div>
+
+<div class="overlay" id="result" hidden>
+  <div class="card">
+    <h2 id="resTitle"></h2>
+    <p id="resText"></p>
+    <ul class="reslist" id="resList"></ul>
+    <p class="dim" id="resTown"></p>
+    <p class="dim" id="resSeed" style="font-size:11px;opacity:.6;margin:4px 0 10px"></p>   <!-- 這關的種子：回報怪圖用 -->
+    <button class="go" id="nextBtn">回小鎮</button>
+  </div>
+</div>
+
+<div class="overlay" id="final" hidden>   <!-- 朋友版：三關玩完的總成績 -->
+  <div class="card">
+    <h2>三趟救援結束</h2>
+    <p class="dim" id="finalSub"></p>
+    <ul class="reslist" id="finalList"></ul>
+    <pre class="sharetxt" id="shareTxt"></pre>
+    <button class="go" id="shareBtn">分享成績</button>
+    <button class="go alt" id="contBtn">繼續（進小鎮自由玩）</button>
+    <button class="go alt" id="restartBtn">重新開始</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+'use strict';
+// ================= GEN START =================
+// 地圖大小（公尺）。Lu 要的找人地圖是 400；改成 52 就是原本的小地圖（等比例版）。
+// 方塊數量不爆增：大地圖把每格放大成 4 公尺（100×100 格），小地圖維持 2 公尺（26×26 格）。
+var MAP_M=400;
+var BIG=MAP_M>100;                 // 大地圖才有的處理（地形加高、部分道路不畫、散落地標）
+var LS=BIG?4:1;                    // 高度層數倍率：大地圖每層只有 11 公分、共 0～24 層（最高約 5.4 公尺）。
+                                   // 層數切細，坡才是緩坡不是階梯，開得動；山夠高，山稜才擋得住訊號
+var TILE=BIG?4:2, STEP=0.45/LS, N=Math.round(MAP_M/TILE), HALF=N*TILE/2, BEV=BIG?0.5:0.22;   // BEV 0.5＝整格圓滑過渡
+var HILL_RATIO=[1.2,2.0];   // 丘陵篩圖：最短路線是直線距離的幾倍（山矮了以後到處爬得上，不像以前要 1.5～2.0）
+var VAL_DIST=[200,300];   // 河谷：傷者離小鎮直線幾公尺（Lu 2026-10-13：原本 150～240 太近）
+var HILL_DIST=[200,350],HILL_EXTRA=10,HILL_WALLS=30;   // 丘陵：傷者離小鎮直線幾公尺（其他任務用 START_DIST）；主谷、死路谷以外，另外在整張圖散幾條谷、幾道牆（遠處也有地形）
+var HILL_K=0.5,HILL_PAT=16;   // 丘陵：山的高度倍數（原本 1）、地面起伏每格升降層數（0＝不起伏；16 層≈24°）
+var MT='valley';                   // 任務類型：valley 河谷、cliff 懸崖路、hills 丘陵（小鎮畫面輪流出）
+var START_DIST=[0.375,0.6];        // 目標離小鎮的距離 ＝ MAP_M × 這個範圍（400 m 時是 150～240 m）
+var ROAD_FRAC=BIG?0.4:1;           // （難度會覆蓋，見 DIFFS.roadFrac）
+var DP=null;                       // 目前難度的參數，見 DIFFS（在無線電設定那一段）           // 小鎮往目標的土路只畫前這麼多比例，後面不畫，免得順著路就找到人
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function clamp(v,a,b){return v<a?a:v>b?b:v;}
+function sm(t){return t*t*(3-2*t);}
+function ss(e0,e1,x){return sm(clamp((x-e0)/(e1-e0),0,1));}
+var SURF={   // 地形 → 要開哪個模式：岩地（岩盤、碎石）＝低速檔、沙地＝洩氣、泥地＝差速鎖、河＝升高；草地和路面什麼都不選
+  town:{name:'路面',color:0x9c8f82},
+  dirt:{name:'土路',color:0xb08052},
+  grass:{name:'草地',color:0x7f9a4c},
+  gravel:{name:'岩地',color:0x9aa1ab},
+  rock:{name:'岩地',color:0x80869a},
+  sand:{name:'沙地',color:0xeccb78},
+  mud:{name:'泥地',color:0x4a3222},
+  water:{name:'河',color:0x3f8f9c}
+};
+var MODE_OF={gravel:'rock',rock:'rock',sand:'sand',mud:'mud',water:'river'};   // 沒列出的（草地、土路、路面）＝不選模式
+var SLOW=0.1;   // 模式不對時極速剩多少（不會停下來）
+function idx(i,j){return i*N+j;}
+function inTown(i,j){return i<=3&&j<=3;}
+var HOUSES=[[0,0],[0,3],[3,0]];
+
+function generate(seed){
+  var R=mulberry32(seed);
+  function grid(G){var g=[];for(var k=0;k<(G+1)*(G+1);k++)g.push(R());return g;}
+  function vn(g,G,u,v){var x=u*G,y=v*G,i=Math.min(Math.floor(x),G-1),j=Math.min(Math.floor(y),G-1),fx=sm(x-i),fy=sm(y-j);
+    var a=g[i*(G+1)+j],b=g[(i+1)*(G+1)+j],c=g[i*(G+1)+j+1],d=g[(i+1)*(G+1)+j+1];return a+(b-a)*fx+(c-a)*fy+(a-b-c+d)*fx*fy;}
+  var g1=grid(5),g2=grid(11),g3=grid(7),gH1=(MT==='hills'&&BIG)?grid(9):null,gH2=(MT==='hills'&&BIG)?grid(19):null;
+  var level=new Int16Array(N*N),surf=new Array(N*N),depth=new Float32Array(N*N),solid=new Uint8Array(N*N),band=new Uint8Array(N*N),sandN=new Float32Array(N*N);
+  var i,j,k,a,b,id,D=DP,FEAT=BIG,REL=FEAT?D.relief:1;   // D＝目前難度的地形參數
+  var VAL=FEAT&&MT==='valley',HILL=FEAT&&MT==='hills',CL=FEAT&&MT==='cliff';
+  var cliffRockSpots=[],cliffDecor=[],clAnchors=[],clInfo=null;   // 懸崖路：路上原有落石的位置、除錯資料
+  var cliffMask=null,roadM=new Uint8Array(N*N),tiltA=null,cnxA=null,cnzA=null,roadPts=[],cps=[],cliffSurf=null;
+  for(i=0;i<N;i++)for(j=0;j<N;j++){
+    var u=(i+0.5)/N,v=(j+0.5)/N;
+    var n=0.68*vn(g1,5,u,v)+0.32*vn(g2,11,u,v);
+    if(HILL){level[idx(i,j)]=0;}   // 丘陵的地形在知道目標位置之後再生成（下面）
+    else level[idx(i,j)]=clamp(Math.round((n-0.25)*9.5*LS*REL),0,6*LS*REL);
+    sandN[idx(i,j)]=vn(g3,7,u,v);
+  }
+  // target
+  var ti,tj;
+  // 目標：離小鎮 MAP_M×START_DIST 的距離內隨機挑一格（離邊界至少 3 格）
+  var tries=0;
+  var dMin=HILL?HILL_DIST[0]:VAL?VAL_DIST[0]:MAP_M*START_DIST[0],dMax=HILL?HILL_DIST[1]:VAL?VAL_DIST[1]:MAP_M*START_DIST[1];
+  do{ti=3+Math.floor(R()*(N-6));tj=3+Math.floor(R()*(N-6));var td=Math.hypot(ti-2,tj-2)*TILE;tries++;}
+  while((td<dMin||td>dMax)&&tries<2000);
+  // town：小鎮整平成 L0。大地圖在小鎮周圍把地形壓成緩坡（離小鎮每遠 1 格最多差 2 層），免得小鎮被懸崖圍住
+  var CL_WALL_UP=80;   // 懸崖路：內側山壁比路面高 80 層（約 9 m，原本 22 層＝2.5 m 的 3.6 倍）
+  var L0=CL?120:clamp(level[idx(2,2)],LS,3*LS);   // 懸崖路：小鎮和路在高處（層 120≈13.5 m），崖下在層 2，外側落差約 13 m（原本約 6.6 m）
+  if(FEAT&&!HILL)for(i=0;i<N;i++)for(j=0;j<N;j++){
+    var dtn=Math.hypot(Math.max(0,i-3),Math.max(0,j-3));if(dtn>40)continue;
+    level[idx(i,j)]=Math.round(clamp(level[idx(i,j)],L0-2*dtn,L0+2*dtn));
+  }
+  // ---- 大地圖的難度地形：山稜、目標低窪、溪溝 ----
+  // 座標：公尺。起點 s、目標 t，u＝起點→目標的單位向量，v＝垂直方向（山稜和溪溝沿著 v 延伸）
+  var sx=2.5*TILE-HALF,sz=sx,tx=(ti+0.5)*TILE-HALF,tz=(tj+0.5)*TILE-HALF,DD=Math.hypot(tx-sx,tz-sz);
+  var ux=(tx-sx)/DD,uz=(tz-sz)/DD,vx=-uz,vz=ux;
+  // ---- 丘陵：又密又陡的小山坡，只有坡與坡之間的窄谷能走 ----
+  // 山坡是一座座圓錐（間距約 6 格，半徑 4～6.7 格，高 8～9 m），坡度 12～26 層/格：多半是紅（≥30°，爬不上）、一部分黃（15～30°，要低速檔）。
+  // 然後挖出一條彎來彎去的主谷（寬約 2 格的綠色谷底）從小鎮通到傷者，加幾條走到底是陡坡的死路谷。
+  if(HILL){
+    var cones=[],spc=6,ncn=Math.ceil(N/spc)+2,ci2,cj2;
+    for(ci2=-1;ci2<ncn;ci2++)for(cj2=-1;cj2<ncn;cj2++){
+      var yel=R()<0.30;cones.push({x:(ci2+0.5+(R()-0.5)*0.9)*spc,z:(cj2+0.5+(R()-0.5)*0.9)*spc,r:yel?(5.2+R()*1.0)*0.7:3.4+R()*1.0,h:yel?85+R()*10:100+R()*18});
+    }
+    for(i=0;i<N;i++)for(j=0;j<N;j++){
+      var hb=6;
+      for(k=0;k<cones.length;k++){var cn=cones[k],dd=Math.hypot(i+0.5-cn.x,j+0.5-cn.z);if(dd<cn.r){var hh=6+HILL_K*cn.h*(1-dd/cn.r);if(hh>hb)hb=hh;}}
+      level[idx(i,j)]=clamp(Math.round(hb),2,125);
+    }
+    var chD=new Float32Array(N*N).fill(99),mainD=new Float32Array(N*N).fill(99),lines=[];
+    var inMap=function(v2){return clamp(v2,-HALF+8,HALF-8);};
+    var main=[],mph=R()*6.28,mA=50,mL=75;
+    for(var ma=0;ma<=DD;ma+=2){var mw=mA*Math.sin(ma*6.2832/mL+mph)*Math.max(0,Math.min(1,ma/30,(DD-ma)/30));main.push([inMap(sx+ux*ma+vx*mw),inMap(sz+uz*ma+vz*mw)]);}
+    lines.push(main);
+    [0.22,0.47,0.72].forEach(function(fr,bi){   // 死路谷：從主谷岔出去，走到底是陡坡
+      var m0=main[Math.min(main.length-1,Math.round(main.length*fr))],sg=R()<0.5?-1:1,bl=[],bph=R()*6.28,len=45+R()*35;
+      for(var bt=0;bt<=len;bt+=2)bl.push([inMap(m0[0]+vx*sg*bt+ux*10*Math.sin(bt/13+bph)),inMap(m0[1]+vz*sg*bt+uz*10*Math.sin(bt/13+bph))]);
+      lines.push(bl);
+    });
+    for(var xe=0;xe<HILL_EXTRA;xe++){   // 散在整張圖的谷（不靠小鎮 15 格內）：長 60～110 m、隨機方向、彎來彎去；可能接上主谷，也可能是死路
+      var ex0,ez0,etr=0;do{ex0=(R()*0.9+0.05)*MAP_M-HALF;ez0=(R()*0.9+0.05)*MAP_M-HALF;etr++;}while(Math.hypot(ex0-sx,ez0-sz)<15*TILE&&etr<50);
+      var ea=R()*6.28,edx=Math.cos(ea),edz=Math.sin(ea),eln=60+R()*50,eph=R()*6.28,el=[];
+      for(var et=0;et<=eln;et+=2)el.push([inMap(ex0+edx*et-edz*12*Math.sin(et/15+eph)),inMap(ez0+edz*et+edx*12*Math.sin(et/15+eph))]);
+      lines.push(el);
+    }
+    lines.forEach(function(ln,li){ln.forEach(function(pt2){
+      var pc=(pt2[0]+HALF)/TILE-0.5,pq=(pt2[1]+HALF)/TILE-0.5,c0=Math.round(pc),q0=Math.round(pq);
+      for(var ai=c0-8;ai<=c0+8;ai++)for(var aj=q0-8;aj<=q0+8;aj++){if(ai<0||aj<0||ai>=N||aj>=N)continue;var dq=Math.hypot(ai-pc,aj-pq);if(dq<chD[idx(ai,aj)])chD[idx(ai,aj)]=dq;if(li===0&&dq<mainD[idx(ai,aj)])mainD[idx(ai,aj)]=dq;}
+    });});
+    for(i=0;i<N;i++)for(j=0;j<N;j++){var cd=chD[idx(i,j)];if(cd>8)continue;var capH=Math.round(6+22*Math.max(0,cd-1.1));if(level[idx(i,j)]>capH)level[idx(i,j)]=capH;}   // 谷底 6 層，兩側谷壁每格升 22 層（紅，爬不上）
+    for(i=0;i<=3;i++)for(j=0;j<=3;j++)level[idx(i,j)]=6;
+    // 地面起伏：整張圖沿 i 方向加三角波（週期 6 格、每格升降 HILL_PAT 層＝約 24°），谷底和平地也都是要小心的黃色斜坡，幾乎沒有綠色；
+    // 只在低處（谷底、平地）起伏、往上淡出（山的高度不被加高；山坡本身都 ≥15°），離小鎮 4 格內從平地慢慢淡入（出得了小鎮）
+    var PATW=[0,1,2,3,2,1];
+    for(i=0;i<N;i++)for(j=0;j<N;j++){
+      if(i<=3&&j<=3)continue;
+      var fb=level[idx(i,j)],fh=clamp(1-(fb-12)/14,0,1),fdn=clamp(Math.hypot(Math.max(0,i-3),Math.max(0,j-3))/4,0,1);
+      level[idx(i,j)]=clamp(Math.round(fb+PATW[i%6]*HILL_PAT*fh*fdn),2,125);
+    }
+    // 堵捷徑：反覆找出目前最短可走路線，在路線中段橫著築一道牆（抬高或挖深 50 層，兩側落差 >20＝過不去），
+    // 直到最短路線長度 ≥ 直線距離的 1.6 倍。主谷受保護不會被堵，所以一定走得到
+    var goalId=idx(ti,tj),stl=Math.hypot(ti-2,tj-2);
+    var spath=function(){
+      var cost=new Float32Array(N*N).fill(1e9),pred=new Int32Array(N*N).fill(-1),inq=new Uint8Array(N*N),q=[idx(2,2)],hh2;cost[q[0]]=0;
+      for(hh2=0;hh2<q.length;hh2++){
+        var c=q[hh2],ci=(c/N)|0,cj=c%N;inq[c]=0;
+        for(var di=-1;di<=1;di++)for(var dj=-1;dj<=1;dj++){
+          if(!di&&!dj)continue;var ni=ci+di,nj=cj+dj;if(ni<0||nj<0||ni>=N||nj>=N)continue;var n=ni*N+nj;
+          if(Math.abs(level[c]-level[n])>20)continue;
+          if(di&&dj&&(Math.abs(level[c]-level[ci*N+nj])>20||Math.abs(level[c]-level[ni*N+cj])>20))continue;
+          var nc=cost[c]+(di&&dj?1.414:1);if(nc<cost[n]){cost[n]=nc;pred[n]=c;if(!inq[n]){inq[n]=1;q.push(n);}}
+        }
+      }
+      return {cost:cost[goalId],pred:pred};
+    };
+    for(var wit=0;wit<40;wit++){
+      var sr=spath();if(sr.cost<1e8&&sr.cost/stl>=1.6)break;
+      if(sr.cost>=1e8)break;
+      var pth=[],pc2=goalId;while(pc2>=0){pth.push(pc2);pc2=sr.pred[pc2];}pth.reverse();
+      var wm=Math.floor(pth.length*(0.2+R()*0.6)),wa=pth[Math.max(0,wm-3)],wb=pth[Math.min(pth.length-1,wm+3)],wc=pth[wm];
+      var wdx=((wb/N)|0)-((wa/N)|0),wdz=(wb%N)-(wa%N),wdl=Math.hypot(wdx,wdz)||1;wdx/=wdl;wdz/=wdl;
+      var wpx=-wdz,wpz=wdx,wci=(wc/N)|0,wcj=wc%N,bak=[];
+      for(var wt=-10;wt<=10;wt++)for(var wth=-1;wth<=1;wth++){
+        var wi=Math.round(wci+wpx*wt+wdx*wth),wj=Math.round(wcj+wpz*wt+wdz*wth);if(wi<0||wj<0||wi>=N||wj>=N)continue;
+        var wid=idx(wi,wj);if(mainD[wid]<=1.7||(wi<=4&&wj<=4)||Math.hypot(wi-ti,wj-tj)<3)continue;
+        bak.push([wid,level[wid]]);var wl=level[wid];level[wid]=wl<=60?wl+26:Math.max(2,wl-26);   // 牆高 26 層（>20＝過不去）
+      }
+      if(spath().cost>=1e8)bak.forEach(function(b2){level[b2[0]]=b2[1];});   // 這道牆把路堵死了就拆掉
+    }
+    // 散在整張圖的牆（不只在路線上）：隨機位置、隨機方向，同樣高 26 層；離小鎮 15 格、傷者 3 格內、最短路線 6 格內、主谷上都不放；
+    // 讓到傷者的最短路變長就拆掉（只豐富路線以外的地形；路線難度交給上面堵捷徑的牆。不拆的話常把路擠成車過不去的窄縫）
+    var fsr=spath(),fbase=fsr.cost,fnear=new Uint8Array(N*N),fpc=goalId;   // fnear：最短路線 6 格內（機器人和玩家主要走的地方）不放牆
+    while(fpc>=0){var fpi=(fpc/N)|0,fpj=fpc%N;for(var fa2=-6;fa2<=6;fa2++)for(var fb2=-6;fb2<=6;fb2++){var fx2=fpi+fa2,fy2=fpj+fb2;if(fx2>=0&&fy2>=0&&fx2<N&&fy2<N)fnear[idx(fx2,fy2)]=1;}fpc=fsr.pred[fpc];}
+    for(var fw=0;fw<HILL_WALLS;fw++){
+      var fci,fcj,ftr=0;do{fci=3+Math.floor(R()*(N-6));fcj=3+Math.floor(R()*(N-6));ftr++;}while(Math.hypot(fci-2,fcj-2)<15&&ftr<50);
+      var fa=R()*3.1416,fpx=Math.cos(fa),fpz=Math.sin(fa),fbak=[];
+      for(var ft=-10;ft<=10;ft++)for(var fth=-1;fth<=1;fth++){
+        var fi=Math.round(fci+fpx*ft-fpz*fth),fj=Math.round(fcj+fpz*ft+fpx*fth);if(fi<0||fj<0||fi>=N||fj>=N)continue;
+        var fid=idx(fi,fj);if(fnear[fid]||mainD[fid]<=1.7||(fi<=4&&fj<=4)||Math.hypot(fi-ti,fj-tj)<3)continue;
+        fbak.push([fid,level[fid]]);var fl=level[fid];level[fid]=fl<=60?fl+26:Math.max(2,fl-26);
+      }
+      if(spath().cost>fbase+0.01)fbak.forEach(function(b2){level[b2[0]]=b2[1];});
+    }
+    // 打散綠色：勘查的「綠」＝四個鄰格高差都 ≤9 層（<15°）。凡是 2×2 以上連成一片的綠格，把其中一格抬高 10 層（抬完和鄰格高差仍 ≤20，爬得過去），
+    // 讓綠色最多只剩 1 格寬的零星小塊，其餘都是黃色的坡（離小鎮 8 格內不處理）
+    var isGreenT=function(a,b){var id=idx(a,b),sl=0;[[1,0],[-1,0],[0,1],[0,-1]].forEach(function(d){var ni=a+d[0],nj=b+d[1];if(ni>=0&&nj>=0&&ni<N&&nj<N)sl=Math.max(sl,Math.abs(level[idx(ni,nj)]-level[id]));});return sl<=9;};
+    var canRaise=function(a,b){var id=idx(a,b),nv=level[id]+10;if(nv>125)return false;var ok=true;[[1,0],[-1,0],[0,1],[0,-1]].forEach(function(d){var ni=a+d[0],nj=b+d[1];if(ni>=0&&nj>=0&&ni<N&&nj<N&&Math.abs(level[idx(ni,nj)]-nv)>20)ok=false;});return ok;};
+    for(var gpass=0;gpass<12;gpass++){
+      var gchg=false;
+      for(i=9;i<N-1;i++)for(j=9;j<N-1;j++){
+        if(isGreenT(i,j)&&isGreenT(i+1,j)&&isGreenT(i,j+1)&&isGreenT(i+1,j+1)){
+          var gc=[[i,j],[i+1,j+1],[i+1,j],[i,j+1]];
+          for(var gk=0;gk<4;gk++){if(canRaise(gc[gk][0],gc[gk][1])){level[idx(gc[gk][0],gc[gk][1])]+=10;gchg=true;break;}}
+        }
+      }
+      if(!gchg)break;
+    }
+  }
+  if(VAL&&D.ridges>0){
+    // 山稜：垂直於起點→目標的連線，高 D.ridgeH 公尺，一側留一個鞍部（缺口），車子要找缺口過去
+    for(var rr=0;rr<D.ridges;rr++){
+      var fr=rr===0?0.5+R()*0.12:0.22+R()*0.1,cx=sx+ux*DD*fr,cz=sz+uz*DD*fr;
+      var b0=(R()<0.5?-1:1)*(45+R()*45),Hl=D.ridgeH/STEP*(rr===0?1:0.75);
+      for(i=0;i<N;i++)for(j=0;j<N;j++){
+        var px=(i+0.5)*TILE-HALF-cx,pz=(j+0.5)*TILE-HALF-cz,aa=px*ux+pz*uz,bb=px*vx+pz*vz;
+        var h=Hl*Math.exp(-Math.pow(aa/D.ridgeW,2))*Math.exp(-Math.pow(bb/170,2))*(1-0.65*Math.exp(-Math.pow((bb-b0)/22,2)));
+        level[idx(i,j)]=clamp(level[idx(i,j)]+Math.round(h),0,120);
+      }
+    }
+  }
+  if(VAL&&D.basin){
+    // 低窪：目標周圍壓成漏斗，每格最多降 3 層（約 0.34 公尺，入門車爬得出來），目標落在碗底
+    for(i=0;i<N;i++)for(j=0;j<N;j++){
+      var dt=Math.hypot(i-ti,j-tj),cap=2*LS+3*Math.max(0,dt-2);
+      if(level[idx(i,j)]>cap)level[idx(i,j)]=Math.round(cap);
+    }
+  }
+  // 河（大地圖）：橫過起點→目標連線、寬約 3 格的水道，兩岸先泥再沙（河灘）；河谷兩側每格最多差 3 層，入門車爬得出來。
+  // 所以從起點到傷者的路線一定會依序碰到沙地、泥地、河各一次（過河靠「升高」）
+  var riverD=new Float32Array(N*N).fill(99);
+  if(VAL&&D.rivers>0){
+    for(var rv=0;rv<D.rivers;rv++){
+      var frv=D.rivers===1?0.4:(rv===0?0.42:0.78)+(R()-0.5)*0.06,rcx=sx+ux*DD*frv,rcz=sz+uz*DD*frv,rph=R()*6.28,rsl=(R()-0.5)*0.5;
+      for(var rt=-330;rt<=330;rt+=2){
+        var rw=22*Math.sin(rt/46+rph)+rt*rsl*0.15,qx=rcx+vx*rt+ux*rw,qz=rcz+vz*rt+uz*rw,qci=(qx+HALF)/TILE-0.5,qcj=(qz+HALF)/TILE-0.5,ci0=Math.round(qci),cj0=Math.round(qcj);
+        for(var ai=ci0-9;ai<=ci0+9;ai++)for(var aj=cj0-9;aj<=cj0+9;aj++){
+          if(ai<0||aj<0||ai>=N||aj>=N)continue;
+          var dq=Math.hypot(ai-qci,aj-qcj);if(dq<riverD[idx(ai,aj)])riverD[idx(ai,aj)]=dq;
+        }
+      }
+    }
+    for(i=0;i<N;i++)for(j=0;j<N;j++){
+      var rd=riverD[idx(i,j)];if(rd>9||(i<=7&&j<=7)||Math.hypot(i-ti,j-tj)<6)continue;
+      var rcap=3*Math.max(0,rd-1.7);if(level[idx(i,j)]>rcap)level[idx(i,j)]=Math.round(rcap);
+    }
+  }
+  // 舊車痕與「只能往下開的坎」：車痕從起點出發沿著往目標的方向走到 0.44 倍距離。約一半的地圖在途中有一塊低 6 層的溝（入門車開得下去、爬不出來）：
+  // 進口是一道 6 層高的坎，兩側也是牆，只有最前面一段緩坡往上，所以回程要繞出去
+  var ledgeMask=new Uint8Array(N*N);
+  var track={sx:sx,sz:sz,ux:ux,uz:uz,vx:vx,vz:vz,s0:10,s1:DD*0.44,ph:R()*6.28,amp:5,off:0,ledge:null};
+  function trackLat(al){return track.amp*Math.sin(al/22+track.ph)+track.off;}
+  // 車痕整條放在地圖裡面（離邊界至少 30 m）：沿垂直方向平移
+  (function(){
+    var Hm=HALF-30,lo=-1e9,hi=1e9;
+    [36,DD*0.44].forEach(function(al){var bx=sx+ux*al,bz=sz+uz*al;[[bx,vx],[bz,vz]].forEach(function(pp){if(Math.abs(pp[1])<1e-3)return;var t1=(-Hm-pp[0])/pp[1],t2=(Hm-pp[0])/pp[1];lo=Math.max(lo,Math.min(t1,t2));hi=Math.min(hi,Math.max(t1,t2));});});
+    track.off=lo<=hi?clamp(0,lo,hi):0;
+  })();
+  // 「只能往下開的坎」（約一半的地圖）：車痕先沿一段緩坡爬上一塊高 6 層（0.68 m）的路基，路基盡頭是一道 6 層的坎。
+  // 往下 6 層入門車開得下去（≤8 層），回程往上爬不上去（>4 層），要從路基側面繞回來
+  var trackClear=new Uint8Array(N*N);   // 車痕沿線不放樹、岩石、倒木
+  if(VAL)for(i=0;i<N;i++)for(j=0;j<N;j++){
+    var cpx=(i+0.5)*TILE-HALF-sx,cpz=(j+0.5)*TILE-HALF-sz,cal=cpx*ux+cpz*uz,clat=cpx*vx+cpz*vz-trackLat(cal);
+    if(cal>=0&&cal<=track.s1+12&&Math.abs(clat)<=8)trackClear[idx(i,j)]=1;
+  }
+  if(VAL&&R()<0.5){
+    var la0=44+R()*6,lr0=12,lr1=40,lhalf=16,lap=14;
+    function natAt(al,lat){var px=sx+ux*al+vx*(trackLat(al)+lat),pz=sz+uz*al+vz*(trackLat(al)+lat);return level[idx(clamp(Math.floor((px+HALF)/TILE),0,N-1),clamp(Math.floor((pz+HALF)/TILE),0,N-1))];}
+    var B=natAt(la0+4,0),P=B+6,natS=natAt(lr0,0),natE=natAt(la0+lap+4,0);
+    // 路基頂面 P＝坎外側整平地面 B＋6，所以坎高剛好 6 層：下得去（≤8）、上不來（>4）。坡太陡的地方就不做
+    if(Math.abs(P-natS)<=12&&Math.abs(natE-B)<=8){
+      track.ledge={a0:la0,half:lhalf};
+      for(i=0;i<N;i++)for(j=0;j<N;j++){
+        var lpx=(i+0.5)*TILE-HALF-sx,lpz=(j+0.5)*TILE-HALF-sz,lal=lpx*ux+lpz*uz,llat=lpx*vx+lpz*vz-trackLat(lal);
+        if(Math.abs(llat)>lhalf||lal<lr0||lal>la0+lap||(i<=3&&j<=3))continue;
+        var nv=level[idx(i,j)];
+        if(lal<=la0){var lf=lal>=lr1?1:(lal-lr0)/(lr1-lr0);nv=Math.round(nv*(1-lf)+P*lf);}      // 緩坡爬上路基
+        else{var lg=Math.max(0,(lal-la0-6)/(lap-6));nv=Math.round(B*(1-lg)+nv*lg);}              // 坎外側 6 m 先整平成 B（坎高剛好 6 層），再慢慢接回地形
+        level[idx(i,j)]=nv;ledgeMask[idx(i,j)]=1;
+      }
+    }
+  }
+  var natural=level.slice();
+  for(i=0;i<=3;i++)for(j=0;j<=3;j++){level[idx(i,j)]=L0;}
+  // ---- 懸崖路：一條從小鎮彎彎曲曲通到傷者的路。路是一格寬，一側是山壁（很高，撞上去會擋）、另一側是懸崖（掉下去回檢查點）。
+  // 路面有上下坡，也有外傾（往懸崖斜）／內傾（往山壁斜）的段落 ----
+  if(CL){
+    cliffMask=new Uint8Array(N*N);tiltA=new Float32Array(N*N);cnxA=new Float32Array(N*N);cnzA=new Float32Array(N*N);cliffSurf=new Array(N*N);
+    var tph1=R()*6.28,tph2=R()*6.28;
+    // ---- 路線：直走＋彎一段一段接起來，朝目標走；中間穿插 S 彎（半徑 13～17 m）和髮夾彎（半徑 9～11 m，成對折返）----
+    // 曲率 k>0＝往山壁那側轉（髮夾彎的內側是山壁，像繞著一根岩柱），所以髮夾彎只在目標在山壁側時才接
+    var tgx=tx,tgz=tz,CLP={sbend:0.30,hair:0.34};
+    var wrapA=function(a2){while(a2>Math.PI)a2-=2*Math.PI;while(a2<-Math.PI)a2+=2*Math.PI;return a2;};
+    var whyL=[];
+    var mkPath=function(salt,relax){
+      var Rr=mulberry32((seed^0x51ed77)+salt*7919),out=[],spans=[],x=sx,z=sz,th=Math.atan2(tgx-sx,tgz-sz),sArc=0,wobp=Rr()*6.28,pend=[],cmd=null,rem=0,evId=0,curEv=null,lastA=-1,guard=0;
+      var nextCmd=function(){
+        if(pend.length)return pend.shift();
+        var dT=Math.hypot(tgx-x,tgz-z),err=wrapA(Math.atan2(tgx-x,tgz-z)-th),r=Rr();
+        if(dT>75&&err>=-0.2&&r<CLP.hair){   // 髮夾彎：往山壁側折返，間隔一小段直路再折回來
+          var Rh=9+Rr()*2,ang=(150+Rr()*20)*Math.PI/180,leg=14+Rr()*10;evId++;
+          pend.push({k:0,len:leg,ev:evId,kind:'hair'},{k:-1/Rh,len:Rh*ang,ev:evId,kind:'hair'},{k:0,len:6,ev:0});
+          return {k:1/Rh,len:Rh*ang,ev:evId,kind:'hair'};
+        }
+        if(dT>60&&r<CLP.hair+CLP.sbend){   // S 彎：先往一邊再往另一邊
+          var Rs=13+Rr()*4,ang1=(55+Rr()*25)*Math.PI/180,sg=Rr()<0.5?1:-1;evId++;
+          pend.push({k:-sg/Rs,len:Rs*ang1,ev:evId,kind:'sbend'},{k:0,len:5,ev:0});
+          return {k:sg/Rs,len:Rs*ang1,ev:evId,kind:'sbend'};
+        }
+        return {k:null,len:14+Rr()*18,ev:0};
+      };
+      while(guard++<20000){
+        if(rem<=0){cmd=nextCmd();rem=cmd.len;
+          if(cmd.ev&&(!curEv||curEv.id!==cmd.ev)){curEv={id:cmd.ev,s0:sArc,s1:sArc,kind:cmd.kind};spans.push(curEv);}
+          if(!cmd.ev)curEv=null;}
+        var k2;
+        if(cmd.k===null){var er=wrapA(Math.atan2(tgx-x,tgz-z)-th);k2=clamp(er*0.05,-1/40,1/40)+0.012*Math.sin(sArc/19+wobp);k2=clamp(k2,-1/35,1/35);}
+        else k2=cmd.k;
+        th+=k2*0.5;x+=Math.sin(th)*0.5;z+=Math.cos(th)*0.5;sArc+=0.5;rem-=0.5;
+        if(curEv&&cmd.ev===curEv.id)curEv.s1=sArc;
+        if(Math.floor(sArc)!==lastA){lastA=Math.floor(sArc);out.push({x:x,z:z,a:lastA});}
+        if(Math.hypot(tgx-x,tgz-z)<7)break;
+        if(sArc>1700){whyL.push('len');return null;}
+      }
+      if(Math.hypot(tgx-x,tgz-z)>=7){whyL.push('end');return null;}
+      for(var q1=0;q1<out.length;q1++){
+        if(q1>=25&&(Math.abs(out[q1].x)>HALF-8||Math.abs(out[q1].z)>HALF-8)){whyL.push('bounds');return null;}
+        for(var q2=0;q2<q1-60;q2++)if(Math.hypot(out[q1].x-out[q2].x,out[q1].z-out[q2].z)<12){whyL.push('self');return null;}   // 折返的兩條路不能貼太近
+      }
+      var nHair=0;spans.forEach(function(e2){if(e2.kind==='hair')nHair++;});
+      if(relax?spans.length<2:(nHair<1||spans.length<3)){whyL.push('few');return null;}   // 至少 1 個髮夾彎、共 3 個以上的急彎
+      return {pts:out,spans:spans};
+    };
+    var mp=null;for(var salt=0;salt<80&&!mp;salt++)mp=mkPath(salt,false);
+    for(salt=80;salt<160&&!mp;salt++)mp=mkPath(salt,true);   // 太短的地圖放不下髮夾彎，退而求其次：至少 2 個急彎
+    var CP=[],clSpans=[];
+    if(mp){CP=mp.pts;clSpans=mp.spans;}
+    else{for(var ca=0;ca<=DD;ca+=1)CP.push({x:sx+ux*ca,z:sz+uz*ca,a:ca});}   // 找不到合格路線時退回直線
+    var LENc=CP[CP.length-1].a;
+    for(k=0;k<CP.length;k++){var pa=CP[Math.max(0,k-2)],pb=CP[Math.min(CP.length-1,k+2)],ttx=pb.x-pa.x,ttz=pb.z-pa.z,tl2=Math.hypot(ttx,ttz)||1;CP[k].tx=ttx/tl2;CP[k].tz=ttz/tl2;CP[k].nx=-CP[k].tz;CP[k].nz=CP[k].tx;}   // n＝往懸崖
+    // 路寬：平路寬 1～4 格（隨機分段、平順過渡）；髮夾彎和 S 彎的路段 2～3 格。可走半徑 rr＝3.0 m（1 格）～8.0 m（4 格）
+    var tightA=[];   // 每公尺：這裡是不是急彎（前後 6 m 的轉向角 → 半徑 <19 m）
+    for(k=0;k<CP.length;k++){var kp=Math.max(0,k-6),kn=Math.min(CP.length-1,k+6),a1=Math.atan2(CP[k].x-CP[kp].x,CP[k].z-CP[kp].z),a2=Math.atan2(CP[kn].x-CP[k].x,CP[kn].z-CP[k].z),da=Math.abs(wrapA(a2-a1));tightA.push(da/Math.max(1,(kn-kp)/2)> 1/19);}
+    var isTight=function(a0,a1b){for(var kt=Math.max(0,Math.floor(a0)-4);kt<=Math.min(CP.length-1,Math.ceil(a1b)+4);kt++)if(tightA[kt])return true;return false;};
+    var wsp=[],evAt=function(a2){for(var e2=0;e2<clSpans.length;e2++)if(a2>=clSpans[e2].s0-4&&a2<=clSpans[e2].s1+4)return true;return false;};
+    // 依「急彎／直路」把全程切成一段一段，每段隨機 1～3 級（急彎也可以 1 級，過不去的地方由下面的幾何檢查局部加寬）；頭 20 m、尾 25 m 固定最寬級
+    var tightD=function(k8){for(var kk=Math.max(0,k8-2);kk<=Math.min(CP.length-1,k8+2);kk++)if(tightA[kk])return true;return false;};
+    var cuts=[0],prevT=tightD(0);
+    for(k=1;k<=LENc;k++){var tn=k<CP.length?tightD(k):prevT;if(tn!==prevT||k===20||k===Math.round(LENc-25)||k===LENc){cuts.push(k);prevT=tn;}}
+    cuts=cuts.filter(function(v,ix){return ix===0||v>cuts[ix-1];});
+    var pieces=[];
+    for(var ci3=0;ci3<cuts.length-1;ci3++){
+      var p0=cuts[ci3],p1=cuts[ci3+1],pl=p1-p0,nsub=Math.max(1,Math.round(pl/40)),sl=pl/nsub;
+      for(var sb=0;sb<nsub;sb++)pieces.push([p0+sb*sl,p0+(sb+1)*sl]);
+    }
+    pieces.forEach(function(pc){
+      var wv,isEdge=pc[0]<20||pc[0]>=LENc-25-0.5,tgAny=false;
+      for(var kq=Math.floor(pc[0]);kq<Math.min(CP.length,Math.ceil(pc[1]));kq++)if(tightA[kq]){tgAny=true;break;}
+      if(isEdge)wv=4;   // 最寬的一級（可走半徑 8 m）只用在起點和終點附近
+      else wv=R()<0.65?1:(R()<0.5?2:3);
+      wsp.push({s0:pc[0],s1:pc[1],w:wv,edge:isEdge,ev:false});
+    });
+    var wtAt=function(a2){
+      var k3=0;while(k3<wsp.length-1&&a2>=wsp[k3].s1)k3++;
+      var w0=wsp[k3].w,bb,wp,wn,t3;
+      if(k3>0&&a2-wsp[k3].s0<7){bb=wsp[k3].s0;wp=wsp[k3-1].w;wn=w0;t3=sm(clamp((a2-bb+7)/14,0,1));w0=wp+(wn-wp)*t3;}
+      else if(k3<wsp.length-1&&wsp[k3].s1-a2<7){bb=wsp[k3].s1;wp=w0;wn=wsp[k3+1].w;t3=sm(clamp((a2-bb+7)/14,0,1));w0=wp+(wn-wp)*t3;}
+      return w0;
+    };
+    var midSegs=wsp.filter(function(sg){return !sg.edge;}),midLen=0;midSegs.forEach(function(sg){midLen+=sg.s1-sg.s0;});
+    var lenOf=function(w){var c=0;for(var a3=20;a3<=LENc-25;a3++)if(Math.round(wtAt(a3))===w)c++;return c;};
+    for(var adj=0;adj<80&&midLen>0;adj++){   // 調整到 1 級約 35～40%
+      var f1=lenOf(1)/Math.max(1,LENc-45),pool;
+      if(f1<0.35){pool=midSegs.filter(function(sg){return sg.w>1&&!sg.ev;});if(!pool.length)break;pool[Math.floor(R()*pool.length)].w=1;}
+      else if(f1>0.40){pool=midSegs.filter(function(sg){return sg.w===1;});pool[Math.floor(R()*pool.length)].w=R()<0.5?2:3;}
+      else break;
+    }
+    for(adj=0;adj<60&&midLen>0;adj++){   // 2 級和 3 級大致平分
+      var l2=lenOf(2),l3=lenOf(3);if(Math.abs(l2-l3)<=0.1*(l2+l3))break;
+      var big=l2>l3?2:3,pool2=midSegs.filter(function(sg){return sg.w===big;});if(!pool2.length)break;pool2[Math.floor(R()*pool2.length)].w=big===2?3:2;
+    }
+    var wneed=[1,2,3];   // 1～3 級各至少出現一段
+    midSegs.forEach(function(sg3){var ix=wneed.indexOf(sg3.w);if(ix>=0)wneed.splice(ix,1);});
+    wneed.forEach(function(wv){var cand=midSegs.filter(function(sg3){return !(wv<2&&sg3.ev);});if(cand.length)cand[Math.floor(R()*cand.length)].w=wv;});
+    var rrOf=function(w){return 3.0+(w-1)*5/3;};
+    var WtArr=CP.map(function(c0){return wtAt(c0.a);}),rrArr=WtArr.map(rrOf);
+    var prof=function(a2){return Math.round(L0+8*Math.sin(a2/37+1)*Math.max(0,Math.min(1,a2/60,(LENc-a2)/40)));};   // 路面高度：緩緩上下
+    var tiltAt=function(a2){return (0.07*Math.sin(a2/45+tph1)+0.07*Math.sin(a2/17+tph2)+0.02)*Math.max(0,Math.min(1,a2/40,(LENc-a2)/25));};   // 外傾角（弧度），正＝往懸崖斜
+    var arcOf=new Float32Array(N*N).fill(-1),touchInfo={gaps:0,steps:0};
+    var buildTiles=function(){
+      roadM.fill(0);cliffMask.fill(0);tiltA.fill(0);cnxA.fill(0);cnzA.fill(0);arcOf.fill(-1);touchInfo.gaps=0;touchInfo.steps=0;
+      for(i=0;i<N;i++)for(j=0;j<N;j++){
+        if(i<=3&&j<=3)continue;
+        var cpx2=(i+0.5)*TILE-HALF,cpz2=(j+0.5)*TILE-HALF,bk=0,bd=1e9;
+        for(k=0;k<CP.length;k++){var dx2=cpx2-CP[k].x,dz2=cpz2-CP[k].z,d2=dx2*dx2+dz2*dz2;if(d2<bd){bd=d2;bk=k;}}
+        var cq=CP[bk],lat=(cpx2-cq.x)*cq.nx+(cpz2-cq.z)*cq.nz,al=(cpx2-cq.x)*cq.tx+(cpz2-cq.z)*cq.tz,id3=idx(i,j),base=prof(cq.a);
+        var beyond=(bk===0&&al<0)||(bk===CP.length-1&&al>0);   // 路的兩端以外都是山壁
+        roadM[id3]=Math.sqrt(bd)<=rrArr[bk]?1:0;
+        if(roadM[id3]){
+          level[id3]=base;cliffSurf[id3]='rock';tiltA[id3]=tiltAt(cq.a);cnxA[id3]=cq.nx;cnzA[id3]=cq.nz;arcOf[id3]=cq.a;   // 整條都是岩石路（低速檔）
+        }else if(lat<0||beyond){
+          level[id3]=Math.min(300,base+CL_WALL_UP+Math.round(Math.max(0,Math.sqrt(bd)-2)*0.9));cliffSurf[id3]='rock';
+        }else{level[id3]=2;cliffMask[id3]=1;cliffSurf[id3]='grass';}
+      }
+      // 起點接小鎮、盡頭的觀景台（3×3 整平，傷者在這裡）
+      for(i=0;i<N;i++)for(j=0;j<N;j++){if(Math.hypot(i-ti,j-tj)<=1.6){var idp=idx(i,j);level[idp]=prof(LENc);cliffMask[idp]=0;roadM[idp]=1;cliffSurf[idp]='rock';tiltA[idp]=0;arcOf[idp]=LENc;}}
+      // 路線彎回來、兩段路剛好貼在一起（相隔 ≤1 格）：中間那格牆／崖改成路，高低差抹平，讓它們自然相通（可以抄捷徑）
+      for(var gp=0;gp<2;gp++){
+        var rm0=roadM.slice(),lv0=level.slice(),mk=[];
+        for(i=0;i<N;i++)for(j=0;j<N;j++){
+          var gid=idx(i,j);if(rm0[gid]||(i<=3&&j<=3))continue;
+          for(var pr=0;pr<2;pr++){
+            var ai=pr?i:i-1,aj=pr?j-1:j,bi=pr?i:i+1,bj=pr?j+1:j;
+            if(ai<0||aj<0||bi>=N||bj>=N)continue;
+            var ia=idx(ai,aj),ib=idx(bi,bj);
+            if(rm0[ia]&&rm0[ib]&&Math.abs(arcOf[ia]-arcOf[ib])>25){mk.push([gid,ia,ib]);break;}
+          }
+        }
+        mk.forEach(function(m){var g2=m[0];level[g2]=Math.round((lv0[m[1]]+lv0[m[2]])/2);roadM[g2]=1;cliffMask[g2]=0;cliffSurf[g2]='rock';tiltA[g2]=0;cnxA[g2]=cnxA[m[1]];cnzA[g2]=cnzA[m[1]];arcOf[g2]=arcOf[m[1]];touchInfo.gaps++;});
+      }
+      var cnt0=0;
+      for(i=0;i<N;i++)for(j=0;j<N;j++){var id9=idx(i,j);if(!roadM[id9])continue;[[1,0],[0,1]].forEach(function(d9){var ni=i+d9[0],nj=j+d9[1];if(ni>=N||nj>=N)return;var nid=idx(ni,nj);if(roadM[nid]&&Math.abs(arcOf[id9]-arcOf[nid])>25&&Math.abs(level[id9]-level[nid])>LS)cnt0++;});}
+      touchInfo.steps=cnt0;
+      for(var pass=0;pass<14;pass++){   // 相鄰兩段路的高度差每輪各讓一層，直到爬得過去
+        var chg=false;
+        for(i=0;i<N;i++)for(j=0;j<N;j++){var id8=idx(i,j);if(!roadM[id8]||(i<=3&&j<=3))continue;
+          [[1,0],[0,1]].forEach(function(d8){var ni=i+d8[0],nj=j+d8[1];if(ni>=N||nj>=N||(ni<=3&&nj<=3))return;var nid=idx(ni,nj);
+            if(!roadM[nid]||Math.abs(arcOf[id8]-arcOf[nid])<=25)return;
+            var dl=level[id8]-level[nid];if(Math.abs(dl)>LS-1){var sg2=dl>0?1:-1;level[id8]-=sg2;level[nid]+=sg2;chg=true;}});}
+        if(!chg)break;
+      }
+    };
+    // ---- 幾何檢查：沿中心線每 2 m 量一次，車子（輪子加車身 10 個點，兩側各留 0.3 m 餘裕）在路面格子上能不能通過（含 4 m 格子的鋸齒、石頭），
+    // 前後取樣點之間可橫移 ≤0.5 m。過不去的地方只把那一小段路局部加寬（不是整個彎都加寬）----
+    var OFFS=[];for(var oo=-3.5;oo<=3.5001;oo+=0.25)OFFS.push(oo);
+    var CARP=[[0.86,1.1],[-0.86,1.1],[0.86,-1.1],[-0.86,-1.1],[0,1.75],[0,-1.75],[0.8,1.6],[-0.8,1.6],[0.9,0],[-0.9,0]];
+    var drv=function(x,z){var ti2=Math.floor((x+HALF)/TILE),tj2=Math.floor((z+HALF)/TILE);if(ti2<0||tj2<0||ti2>=N||tj2>=N)return false;if(ti2<=3&&tj2<=3)return true;return roadM[idx(ti2,tj2)]===1;};
+    var carOK=function(cx,cz,th,rl){
+      var c=Math.cos(th),s2=Math.sin(th);
+      for(var q=0;q<CARP.length;q++){
+        var lx=CARP[q][0],lz=CARP[q][1];if(lx>0.3)lx+=0.3;else if(lx<-0.3)lx-=0.3;
+        var wx=cx+lx*c+lz*s2,wz=cz-lx*s2+lz*c;
+        if(!drv(wx,wz))return false;
+        if(rl)for(var r=0;r<rl.length;r++){var o=rl[r];if(Math.hypot(wx-o.x,wz-o.z)<o.r+(q<4?0.35:0.25))return false;}
+      }
+      return true;
+    };
+    var geoFails=function(rl){
+      var fails=[],prev=null;
+      for(var k8=0;k8<CP.length;k8+=2){
+        var c0=CP[k8],th=Math.atan2(c0.tx,c0.tz),cur=[],any=false;
+        for(var oi=0;oi<OFFS.length;oi++){
+          var ok;
+          if(prev&&!(prev[oi]||(oi>0&&prev[oi-1])||(oi<OFFS.length-1&&prev[oi+1])||(oi>1&&prev[oi-2])||(oi<OFFS.length-2&&prev[oi+2])))ok=false;
+          else ok=carOK(c0.x+c0.nx*OFFS[oi],c0.z+c0.nz*OFFS[oi],th,rl);
+          cur.push(ok);if(ok)any=true;
+        }
+        if(!any){fails.push(k8);prev=null;}else prev=cur;
+      }
+      return fails;
+    };
+    var rrBase=rrArr.slice(),widenInfo={rounds:0,spots:0,maxAddM:0,widenedM:0};
+    for(var wr=0;wr<18;wr++){
+      buildTiles();
+      var ff=geoFails(null);
+      if(!ff.length)break;
+      widenInfo.rounds++;if(wr===0){var lastF=-99;ff.forEach(function(kf){if(kf-lastF>12)widenInfo.spots++;lastF=kf;});}
+      ff.forEach(function(kf){for(var kw=Math.max(0,kf-8);kw<=Math.min(CP.length-1,kf+8);kw++){rrArr[kw]=Math.min(8.5,rrArr[kw]+0.6*(1-Math.abs(kw-kf)/9));}});
+    }
+    var wEff=rrArr.map(function(rr3){return 1+(rr3-3.0)*0.6;});   // 實際（加寬後）的平路寬級別
+    for(k=0;k<CP.length;k++){if(rrArr[k]>rrBase[k]+0.1)widenInfo.widenedM++;widenInfo.maxAddM=Math.max(widenInfo.maxAddM,rrArr[k]-rrBase[k]);}
+    for(k=0;k<CP.length;k++)roadPts.push({x:CP[k].x,z:CP[k].z,nx:CP[k].nx,nz:CP[k].nz,a:CP[k].a,rr:rrArr[k]});
+    var th0=function(k0){var c0=CP[k0];return Math.atan2(c0.tx,c0.tz);};
+    [12,LENc*0.25,LENc*0.5,LENc*0.75].forEach(function(aa){var kk=Math.min(CP.length-1,Math.round(aa));cps.push({x:CP[kk].x,z:CP[kk].z,th:th0(kk)});});   // 檢查點放在路中心線上
+    // 路上的石頭（有碰撞）：每 100 m 約 4～6 顆，任何路寬都能放（窄段放邊邊），但用同一套幾何檢查確認車子還過得去，不行就換位置或不放
+    var rockObs=[],rkA=20+R()*8;
+    while(rkA<LENc-25){
+      var kr=Math.round(rkA);
+      for(var att=0;att<5;att++){
+        var rside=R()<0.5?-1:1,rs=0.8+R()*0.4,rcr=1.4*rs,rlat=rside*(rrArr[kr]-0.15-R()*0.5);
+        var rxx=CP[kr].x+CP[kr].nx*rlat,rzz=CP[kr].z+CP[kr].nz*rlat,near=false;
+        for(var q9=0;q9<rockObs.length;q9++)if(Math.hypot(rockObs[q9].x-rxx,rockObs[q9].z-rzz)<7)near=true;
+        if(near)continue;
+        var cand=rockObs.concat([{x:rxx,z:rzz,r:rcr}]);
+        if(geoFails(cand).length===0){rockObs.push({x:rxx,z:rzz,r:rcr});cliffRockSpots.push({x:rxx,z:rzz,s:rs,a:CP[kr].a,rr:rrArr[kr],side:rside,lat:rlat});break;}
+      }
+      rkA+=14+R()*8;
+    }
+    // 碎石（只是裝飾，沒有碰撞）：小、扁、淺色，散在路面上
+    for(var dk=3;dk<CP.length-3;dk+=2+Math.floor(R()*5)){
+      var dlat=(R()*2-1)*(rrArr[dk]-0.3);
+      cliffDecor.push({x:CP[dk].x+CP[dk].nx*dlat,z:CP[dk].z+CP[dk].nz*dlat,s:0.12+R()*0.2,r:R()*6.28});
+    }
+    // 絞盤錨點：沿路每 10～14 m 一顆大石頭，嵌在山壁腳（n 是往懸崖，所以放在 -n 那側）；往山壁拉＝把車從崖邊拉回路面
+    for(var ak=8;ak<CP.length-4;ak+=10+Math.floor(R()*5)){
+      var alat=-(rrArr[ak]+0.9);
+      clAnchors.push({x:CP[ak].x+CP[ak].nx*alat,z:CP[ak].z+CP[ak].nz*alat,cx:CP[ak].x,cz:CP[ak].z,s:0.9+R()*0.3,r:R()*6.28});
+    }
+    clInfo={len:LENc,spans:clSpans.map(function(e2){return [Math.round(e2.s0),Math.round(e2.s1),e2.kind];}),wt:wEff,rr:rrArr,widen:widenInfo,rockN:cliffRockSpots.length,decorN:cliffDecor.length,pts:CP.map(function(c0){return [c0.x,c0.z];}),usedFallback:!mp,why:whyL.join(','),touch:touchInfo,arcOf:arcOf};
+  }
+  // 溪溝：橫過起點→目標的連線，沿 v 方向歪歪扭扭，寬約 2 格、深 D.creekDip 層；有幾個淺灘（不挖）可以過
+  var creek=new Uint8Array(N*N);
+  if(VAL)for(var cc=0;cc<D.creeks;cc++){
+    var frc=[0.3,0.72,0.42,0.86,0.18][cc%5]+(R()-0.5)*0.06,ccx=sx+ux*DD*frc,ccz=sz+uz*DD*frc,ph=R()*6.28;
+    var fper=D.fordGap,fph=R()*fper;   // 淺灘（缺口）每 fordGap 公尺一個、寬 10 公尺，所以連續的溝壁最長約 fordGap−10 公尺
+    for(var tt=-330;tt<=330;tt+=1.5){
+      if(((tt+330+fph)%fper)<10)continue;
+      var wob=16*Math.sin(tt/38+ph);
+      for(var side=-1;side<=1;side++){
+        var qx=ccx+vx*tt+ux*(wob+side*TILE*0.9),qz=ccz+vz*tt+uz*(wob+side*TILE*0.9);
+        var qi=Math.floor((qx+HALF)/TILE),qj=Math.floor((qz+HALF)/TILE);
+        if(qi<0||qj<0||qi>=N||qj>=N||(qi<=7&&qj<=7)||Math.hypot(qi-ti,qj-tj)<6)continue;
+        var qd=idx(qi,qj);if(creek[qd])continue;creek[qd]=1;level[qd]=Math.max(LS,level[qd]-D.creekDip);
+      }
+    }
+  }
+  // path (monotone runs)
+  var path=[[2,2]],ci=2,cj=2;
+  while(ci!==ti||cj!==tj){
+    var di=Math.sign(ti-ci),dj=Math.sign(tj-cj),moveI;
+    if(di===0)moveI=false;else if(dj===0)moveI=true;else moveI=R()<Math.abs(ti-ci)/(Math.abs(ti-ci)+Math.abs(tj-cj));
+    var run=2+Math.floor(R()*3);
+    for(k=0;k<run;k++){
+      if(moveI){if(ci===ti)break;ci+=di;}else{if(cj===tj)break;cj+=dj;}
+      path.push([ci,cj]);
+    }
+  }
+  var curs=[],cur=L0;
+  for(k=0;k<path.length;k++){
+    var p=path[k],nat=natural[idx(p[0],p[1])];
+    if(k>0&&k%Math.max(1,Math.round(4/LS))===0&&nat!==cur)cur+=Math.sign(nat-cur);
+    if(k>=path.length-5&&cur<LS)cur=LS;
+    curs.push(cur);
+  }
+  var keepRidge=VAL&&D.ridges>0;   // 有山稜：路只在前段整平，免得把山稜挖穿、也順路就找到人
+  for(k=0;k<path.length;k++){
+    if(MT!=='valley'||(keepRidge&&k>=path.length*ROAD_FRAC))break;
+    for(a=-1;a<=1;a++)for(b=-1;b<=1;b++){
+      var x=path[k][0]+a,y=path[k][1]+b;
+      if(x<0||y<0||x>=N||y>=N||inTown(x,y)||riverD[idx(x,y)]<4)continue;
+      level[idx(x,y)]=curs[k];var bv=k<path.length*ROAD_FRAC?1:2;if(!band[idx(x,y)]||bv<band[idx(x,y)])band[idx(x,y)]=bv;   // 1＝看得見的土路，2＝只是整平的路基（沒畫成土路）
+    }
+  }
+  for(k=0;k<path.length;k++){if(MT!=='valley'||(keepRidge&&k>=path.length*ROAD_FRAC))break;var q=path[k];if(!inTown(q[0],q[1])&&riverD[idx(q[0],q[1])]>=4)level[idx(q[0],q[1])]=curs[k];}
+  // surfaces
+  function lv(x,y){x=clamp(x,0,N-1);y=clamp(y,0,N-1);return level[idx(x,y)];}
+  for(i=0;i<N;i++)for(j=0;j<N;j++){
+    var id=idx(i,j),L=level[id];
+    if(inTown(i,j)){surf[id]='town';continue;}
+    if(cliffSurf&&cliffSurf[id]){surf[id]=cliffSurf[id];continue;}
+    if(ledgeMask[id]){surf[id]='dirt';continue;}   // 路基是土路色
+    if(HILL){surf[id]='grass';continue;}   // 丘陵：地表全部是草地（模式全關）
+    if(L===0){
+      surf[id]='water';
+      var c0=0;for(a=-1;a<=1;a++)for(b=-1;b<=1;b++){if((a||b)&&lv(i+a,j+b)===0)c0++;}
+      depth[id]=band[id]?0.3:(c0>=6?0.85:0.4);
+      continue;
+    }
+    var nearW=lv(i+1,j)===0||lv(i-1,j)===0||lv(i,j+1)===0||lv(i,j-1)===0;
+    var sl=Math.max(Math.abs(lv(i+1,j)-L),Math.abs(lv(i-1,j)-L),Math.abs(lv(i,j+1)-L),Math.abs(lv(i,j-1)-L));
+    if(creek[id]&&!band[id])surf[id]='sand';   // 乾河床是沙
+    else if(riverD[id]<3.0)surf[id]='mud';   // 河岸是泥
+    else if(riverD[id]<5&&L<=8*LS)surf[id]='sand';   // 再外面是河灘沙地
+    else if(L<=LS&&nearW)surf[id]='mud';
+    else if(band[id]===1)surf[id]='dirt';
+    else if(HILL&&sl>=10)surf[id]='rock';   // 丘陵：坡度 ≥15°（相鄰格差 10 層以上）算岩地，要開低速檔
+    else if(sl>=(HILL?999:2*LS))surf[id]='gravel';
+    else if(L>=(HILL?999:(BIG?4.0*REL:5)*LS))surf[id]='rock';   // 岩地：高處和陡坡
+    else if(sandN[id]>(BIG?0.70:0.68)&&L<=(BIG?5:3)*LS)surf[id]='sand';   // 低處的沙地
+    else if(BIG&&L<=1.4*LS)surf[id]='mud';   // 低窪積水成泥
+    else if(BIG&&sandN[id]>0.41&&sandN[id]<0.47&&L<=5*LS)surf[id]='mud';   // 內陸的潮濕泥地
+    else if(BIG&&sandN[id]<0.14&&L>=4*LS)surf[id]='gravel';   // 高處的碎石坡
+    else surf[id]='grass';
+  }
+  // trees
+  var trees=[],treeAt=new Uint8Array(N*N),hardT=new Uint8Array(N*N),gF=BIG?grid(9):null;   // 樹不再整格擋路（靠物件形狀判斷）；treeAt 只是避免岩石疊在樹上   // 大地圖：森林噪音，樹成團出現、中間有空地
+  for(i=0;i<N;i++)for(j=0;j<N;j++){
+    id=idx(i,j);
+    if(band[id]||roadM[id]||ledgeMask[id]||trackClear[id]||inTown(i,j)||surf[id]==='water'||surf[id]==='rock'||surf[id]==='sand')continue;
+    var chance=(surf[id]==='grass'?0.13:0.05)*(BIG?0.6:1);   // 大格子面積是 4 倍，樹密度降一點
+    // extra trees beside ledges near the trail, for the winch
+    for(a=-1;a<=1;a++)for(b=-1;b<=1;b++){var x2=i+a,y2=j+b;if(x2>=0&&y2>=0&&x2<N&&y2<N&&band[idx(x2,y2)]&&level[id]-level[idx(x2,y2)]>=2*LS)chance=0.38;}
+    if(BIG)chance*=0.15+1.9*Math.pow(vn(gF,9,(i+0.5)/N,(j+0.5)/N),2);
+    if(R()<chance){treeAt[id]=1;trees.push({i:i,j:j,x:(i+0.5)*TILE-HALF+(R()-0.5)*0.6,z:(j+0.5)*TILE-HALF+(R()-0.5)*0.6,s:0.8+R()*0.5});}
+  }
+  // 岩石與倒木（大地圖）：各佔一格擋路，碎石和岩盤地帶岩石更密。起點附近和目標周圍留空
+  var rocks=[],logs=[];
+  if(FEAT&&!CL)for(i=0;i<N;i++)for(j=0;j<N;j++){
+    id=idx(i,j);
+    if(solid[id]||treeAt[id]||band[id]||roadM[id]||ledgeMask[id]||trackClear[id]||creek[id]||surf[id]==='water'||surf[id]==='town'||(i<8&&j<8)||Math.hypot(i-ti,j-tj)<4)continue;
+    var hard=surf[id]==='gravel'||surf[id]==='rock';
+    if(R()<D.rocks*(hard?3:1)*(HILL?0.5:1)){solid[id]=1;rocks.push({i:i,j:j,x:(i+0.5)*TILE-HALF+(R()-0.5)*1.2,z:(j+0.5)*TILE-HALF+(R()-0.5)*1.2,s:0.8+R()*0.7,r:R()*6.28});}
+    else if(R()<D.logs){solid[id]=1;logs.push({i:i,j:j,x:(i+0.5)*TILE-HALF,z:(j+0.5)*TILE-HALF,s:0.9+R()*0.4,r:R()*3.14});}
+  }
+  cliffRockSpots.forEach(function(sp){   // 懸崖路：路上原有的落石（有碰撞）
+    var ri2=Math.floor((sp.x+HALF)/TILE),rj2=Math.floor((sp.z+HALF)/TILE);if(ri2<0||rj2<0||ri2>=N||rj2>=N)return;
+    treeAt[idx(ri2,rj2)]=1;rocks.push({i:ri2,j:rj2,x:sp.x,z:sp.z,s:sp.s,r:R()*6.28});
+  });
+  for(k=0;k<HOUSES.length;k++){solid[idx(HOUSES[k][0],HOUSES[k][1])]=1;hardT[idx(HOUSES[k][0],HOUSES[k][1])]=1;}
+  // 絞盤錨點：每個水邊格子 12 m 內一定有樹或大石（沒有就在岸邊補一棵），開進河裡卡住時才拉得出來
+  var anc=trees.map(function(t){return [t.x,t.z];}).concat(rocks.map(function(o){return [o.x,o.z];}));
+  for(i=0;i<N;i++)for(j=0;j<N;j++){
+    id=idx(i,j);
+    if(surf[id]==='water'||surf[id]==='town'||band[id]||inTown(i,j))continue;
+    var nearWater=false;for(var dd2=0;dd2<4&&!nearWater;dd2++){var wi=i+[1,-1,0,0][dd2],wj=j+[0,0,1,-1][dd2];if(wi>=0&&wj>=0&&wi<N&&wj<N&&surf[idx(wi,wj)]==='water')nearWater=true;}
+    if(!nearWater)continue;
+    var ax=(i+0.5)*TILE-HALF,az=(j+0.5)*TILE-HALF,have=false;
+    for(var q2=0;q2<anc.length;q2++){if(Math.abs(anc[q2][0]-ax)<12&&Math.abs(anc[q2][1]-az)<12&&Math.hypot(anc[q2][0]-ax,anc[q2][1]-az)<12){have=true;break;}}
+    if(!have){trees.push({i:i,j:j,x:ax+(R()-0.5)*1.0,z:az+(R()-0.5)*1.0,s:1.0+R()*0.4});treeAt[id]=1;anc.push([ax,az]);}
+  }
+  // 把人藏起來：目標周圍圍一圈大樹和大石頭（留縫讓車開得進去），從遠處和 20～30 m 內都不容易直接看到
+  var ck=BIG?1:0.35,ncv=BIG?9:5,cvph=R()*6.28;
+  for(k=0;k<ncv;k++){
+    var cang=cvph+k*6.28/ncv+(R()-0.5)*0.4,cr=(6+R()*5)*ck,cxw=(ti+0.5)*TILE-HALF+0.4+Math.cos(cang)*cr,czw=(tj+0.5)*TILE-HALF+0.4+Math.sin(cang)*cr;
+    var cti=Math.floor((cxw+HALF)/TILE),ctj=Math.floor((czw+HALF)/TILE);
+    if(cti<0||ctj<0||cti>=N||ctj>=N||surf[idx(cti,ctj)]==='water')continue;
+    treeAt[idx(cti,ctj)]=1;
+    if(k%3===2)rocks.push({i:cti,j:ctj,x:cxw,z:czw,s:(1.5+R()*0.6)*(BIG?1:0.5),r:R()*6.28,cover:1});
+    else trees.push({i:cti,j:ctj,x:cxw,z:czw,s:(1.6+R()*0.5)*(BIG?1:0.7),cover:1});
+  }
+  // 碰撞物件表（每格一串）：樹＝圓（樹幹半徑約 0.5 m）、岩石＝圓（照縮放後的大小）、倒木＝線段加半徑。車輪和車身的檢查點進到範圍才算撞到
+  var obst=new Array(N*N);
+  function addO(o,x0,x1,z0,z1){
+    var mg=0.8,i0=Math.floor((x0-mg+HALF)/TILE),i1=Math.floor((x1+mg+HALF)/TILE),j0=Math.floor((z0-mg+HALF)/TILE),j1=Math.floor((z1+mg+HALF)/TILE);
+    for(var ii=Math.max(0,i0);ii<=Math.min(N-1,i1);ii++)for(var jj=Math.max(0,j0);jj<=Math.min(N-1,j1);jj++){var q=ii*N+jj;(obst[q]||(obst[q]=[])).push(o);}
+  }
+  trees.forEach(function(t){t.cr=0.35+0.15*t.s;addO({x:t.x,z:t.z,r:t.cr},t.x-t.cr,t.x+t.cr,t.z-t.cr,t.z+t.cr);});
+  rocks.forEach(function(o){o.cr=(CL?1.4:1.25)*o.s;addO({x:o.x,z:o.z,r:o.cr},o.x-o.cr,o.x+o.cr,o.z-o.cr,o.z+o.cr);});
+  logs.forEach(function(l){var hl=1.7*l.s,dx=Math.cos(l.r)*hl,dz=-Math.sin(l.r)*hl,rr=0.5*l.s;
+    addO({x:l.x-dx,z:l.z-dz,x2:l.x+dx,z2:l.z+dz,r:rr,seg:1},Math.min(l.x-dx,l.x+dx)-rr,Math.max(l.x-dx,l.x+dx)+rr,Math.min(l.z-dz,l.z+dz)-rr,Math.max(l.z-dz,l.z+dz)+rr);});
+  return {seed:seed,type:MT,cl:clInfo,clRocks:cliffRockSpots,clDecor:cliffDecor,clAnchors:clAnchors,limUp:HILL?20:LS,limDown:CL?999:HILL?20+LS:2*LS,hBase:CL?L0*STEP:HILL?3:0,wallK:HILL?0.55:0.18,cliffMask:cliffMask,roadTile:CL?roadM:null,tilt:tiltA,cnx:cnxA,cnz:cnzA,roadPts:roadPts,cps:cps,track:track,obst:obst,hard:hardT,treeAt:treeAt,rocks:rocks,logs:logs,level:level,surf:surf,depth:depth,solid:solid,band:band,trees:trees,path:path,target:{i:ti,j:tj},L0:L0};
+}
+// ================= GEN END =================
+
+// ---------- world helpers ----------
+var W=null;
+function tH(i,j){i=clamp(i,0,N-1);j=clamp(j,0,N-1);var id=idx(i,j);return W.level[id]*STEP-W.depth[id];}
+function groundH(x,z){
+  var u=(x+HALF)/TILE-0.5,v=(z+HALF)/TILE-0.5,i0=Math.floor(u),j0=Math.floor(v);
+  var su=ss(0.5-BEV,0.5+BEV,u-i0),sv=ss(0.5-BEV,0.5+BEV,v-j0);
+  var a=tH(i0,j0),b=tH(i0+1,j0),c=tH(i0,j0+1),d=tH(i0+1,j0+1);
+  var h=a+(b-a)*su+(c-a)*sv+(a-b-c+d)*su*sv;
+  if(W.roadTile){var t=tileOf(x,z);if(t>=0&&W.roadTile[t]){var cc=tileCenter((t/N)|0,t%N);h-=W.tilt[t]*((x-cc[0])*W.cnx[t]+(z-cc[1])*W.cnz[t]);}}   // 外傾：靠懸崖那側比較低
+  return h;
+}
+function tileOf(x,z){var i=Math.floor((x+HALF)/TILE),j=Math.floor((z+HALF)/TILE);if(i<0||j<0||i>=N||j>=N)return -1;return idx(i,j);}
+function tileCenter(i,j){return [(i+0.5)*TILE-HALF,(j+0.5)*TILE-HALF];}
+
+
+// ================= RADIO 無線電設定 =================
+// 全部想調的數字都在這裡。地圖大約 52 公尺見方，目標離出發點約 25～55 公尺。
+var RADIO={
+  // 長度都跟 MAP_M 等比例：400 m 地圖 range＝120，52 m 地圖 range＝15.6
+  // 訊號強弱（0～1）= 距離衰減 × 天線方向 ×（1 − 山稜擋住）。開得越高，等效 range 越大
+  range:MAP_M*0.3,   // 距離衰減：訊號降到 0 的距離（公尺），平地時的值
+  falloff:1.5,       // 衰減曲線指數：>1 時近處掉得慢、遠處掉得快
+  antennaPow:3.5,    // 天線方向性次方：((1+cos夾角)/2)^次方，越大越尖銳（車頭偏 30 度就剩約 77%、偏 60 度剩約 42%）
+  antennaMin:0.15,   // 車尾對著目標時剩多少（0＝完全收不到）
+  eyeH:1.2,          // 訊號線離地高度（公尺），用來判斷山稜有沒有擋住
+  ridgeStep:4,       // 山稜取樣間距（公尺），至少取 8 點、最多 60 點
+  ridgeClear:0.15,   // 地形超過連線這麼多公尺才算擋住（容忍微小起伏）
+  ridgeFull:1.0,     // 被擋住超過這麼多公尺＝完全擋住
+  ridgeLoss:0.8,     // 完全擋住時訊號減少的比例
+  heightGain:0.25,   // 開上高處：車所在地面每高 1 公尺，等效 range 多 25%（5 公尺的山頭＝2.25 倍）
+  // 聲音清晰度（0～1）：決定字幕保留幾成字。距離用 range 的比例
+  // 清晰度 clar＝視線沒被擋的程度 ×（底子 + 高度 + 天線對準）× 距離的小幅扣分；站得高、視線通、天線對準時 150 m 外也聽得到完整一句
+  clarBase:0.2,      // 底子（平地、沒對準時也有的清晰度）
+  clarHeight:0.55,   // 高度的貢獻：車所在地面高度達 clarHeightRef 公尺時拿滿
+  clarAnt:0.25,      // 天線對準的貢獻
+  clarHeightRef:4,   // 高度滿分的公尺數
+  clarRidge:0.9,     // 被山稜完全擋住時，清晰度扣掉的比例（谷底被擋 → 60 m 也只剩雜訊）
+  clarDistW:0.25,    // 距離最多扣多少（到 clarDistRange×MAP_M 時扣滿）
+  clarDistRange:0.9,
+  clarityPow:1.2,    // 清晰度曲線指數：越大，要更靠近才聽得清楚
+  clarityDirMix:0.3, // 天線方向和山稜對清晰度的影響比例（0＝只看距離）
+  // 字幕與聲音
+  talkGap:[6,8],     // 對方每隔幾秒呼叫一次（從這次開始到下次開始）
+  talkLen:[2,3],     // 每次發話幾秒（只有這段時間才有雜訊和人聲嗶，其餘安靜）
+  minSignal:0.04,    // 靜噪門檻：低於它完全安靜（沒有底噪、沒有字幕）；首次超過時「喀」一聲
+  noiseMax:0.042,    // 發話時的雜訊音量上限（訊號最弱時）
+  noiseMin:0.004,    // 雜訊音量下限（訊號最強時）
+  barSmooth:5,       // 訊號表跟隨速度，越大越靈敏（越小，跳動被抹平得越多）
+  faintAmp:0.2,      // 遠處微弱的方向訊號：天線對準時，在 faintRatio×MAP_M 以內會有這麼一點點（雜訊裡偶爾出現），讓玩家知道大概往哪邊走
+  faintRatio:0.8,    // 微弱訊號的距離（MAP_M 的比例）
+  hudMin:0.008,      // 訊號表：高於這個值至少亮 1 格
+  smokeRatio:1.5,    // 信號煙：距離 < smokeRatio × range 才冒（山稜擋住就看不到）
+  smokeAlpha:0.55,   // 煙的濃度
+  smokeDuty:1,       // 煙出現的時間比例（1＝一直有；0.6＝每 9 秒只有前 60%）
+  fadeAmp:0         // 訊號起伏（衰落）幅度：0＝不跳。開車時全幅，停車時只剩 25%，要停下來幾秒平均才看得準
+};
+var RADIO_BASE=Object.assign({},RADIO);   // 預設值：切換難度時先還原再套用，免得上一個難度的設定留下來
+// ================= DIFFICULTY 難度 =================
+// 地形（relief 起伏倍率、ridges 山稜數、ridgeH 山稜高度公尺、ridgeW 山稜寬度公尺、basin 目標在低窪、
+// creeks 溪溝數、creekDip 溪溝深度（層，4 層＝45 公分；入門車爬 4 層、大胎 8 層）、rocks／logs 每格出現機率）
+// 與無線電參數（會覆蓋上面的 RADIO）。簡單版≈第一版 400 m；普通＝目標 3～5 分鐘。
+var DIFFS={   // 每個難度另有 trackLen（舊車痕長度，公尺，以 400 m 地圖計）、trackGap（車痕空白的倍率）
+  easy:{label:'簡單',relief:1,ridges:0,ridgeH:0,ridgeW:34,rivers:1,basin:false,creeks:0,fordGap:42,creekDip:10,rocks:0,logs:0,nearDecoys:0,partialDecoys:false,roadFrac:0.4,trackLen:90,trackGap:0.7,
+    radio:{range:MAP_M*0.30,clarBase:0.3,clarHeight:0.5,clarAnt:0.2,antennaPow:3.5,antennaMin:0.15,ridgeLoss:0.8,ridgeFull:1.0,fadeAmp:0,barSmooth:5}},
+  normal:{label:'普通',relief:1.2,ridges:1,ridgeH:4.2,ridgeW:48,rivers:2,basin:true,creeks:1,fordGap:42,creekDip:10,rocks:0.007,logs:0.006,nearDecoys:2,partialDecoys:true,roadFrac:0.3,trackLen:100,trackGap:1,
+    radio:{range:MAP_M*0.22,clarBase:0.2,clarHeight:0.55,clarAnt:0.25,antennaPow:4.5,antennaMin:0.1,ridgeLoss:0.9,ridgeFull:0.6,fadeAmp:0.45,barSmooth:3}},
+  hard:{label:'困難',relief:1.25,ridges:1,ridgeH:4.6,ridgeW:50,rivers:2,basin:true,creeks:2,fordGap:42,creekDip:11,rocks:0.010,logs:0.007,nearDecoys:3,partialDecoys:true,roadFrac:0.2,trackLen:75,trackGap:1.6,
+    radio:{range:MAP_M*0.19,clarBase:0.12,clarHeight:0.6,clarAnt:0.28,antennaPow:5.2,antennaMin:0.07,ridgeLoss:0.93,ridgeFull:0.55,fadeAmp:0.55,barSmooth:2.8,faintAmp:0.16,smokeAlpha:0.32,smokeDuty:0.6}}
+};
+var diffName='normal';
+function setDifficulty(name){diffName=name;DP=DIFFS[name];Object.assign(RADIO,RADIO_BASE,DP.radio);ROAD_FRAC=BIG?DP.roadFrac:1;
+  ['easy','normal','hard'].forEach(function(n){var b=document.getElementById('diff_'+n);if(b)b.classList.toggle('on',n===name);});}
+setDifficulty('normal');
+var debugMarker=false;   // 按 ` 切換：把救援目標的求救煙霧標記顯示回來
+// 描述：一句話切成幾個詞，字幕以「詞」為單位掉字。地標由 parts 擺在目標附近。
+var SCENARIOS=[   // 描述的是他在低窪裡「看到的遠方」：地標在目標周圍 30～80 m、比較高，句子帶相對關係
+  {id:'tower', line:['我在','水塔','下面的','低窪','看得到','兩棵','大樹'],            parts:['tower','bigTree','bigTree']},
+  {id:'hut',   line:['我在','紅屋頂','小屋下面','的低窪','遠處有','白色','大石頭'],     parts:['hut','whiteRock']},
+  {id:'mill',  line:['風車在','我上面','那個坡','我在','低窪裡','看得到','黃帳篷'],     parts:['windmill','tent']},
+  {id:'look',  line:['瞭望台','在我','上面','我在','大石頭','後面','的低窪'],           parts:['lookout','whiteRock']}
+];
+var scenarioNo=Math.floor(Math.random()*SCENARIOS.length);   // 輪流用，起點隨機
+
+// ---------- three setup ----------
+var $=function(id){return document.getElementById(id);};
+var renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
+var MOBILE=window.matchMedia('(max-width:640px),(pointer:coarse)');   // 手機：陰影貼圖和解析度降一級
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,MOBILE.matches?1.5:2));
+renderer.setSize(innerWidth,innerHeight);
+renderer.setClearColor(0x000000,0);
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+$('stage').appendChild(renderer.domElement);
+var scene=new THREE.Scene();
+scene.fog=null;
+var camera=new THREE.PerspectiveCamera(34,innerWidth/innerHeight,0.5,1400);
+var hemi=new THREE.HemisphereLight(0xffe6cc,0x3d3450,0.58);scene.add(hemi);
+var SUNDIR=new THREE.Vector3(16,30,-12);
+var sun=new THREE.DirectionalLight(0xffcf9e,0.72);
+sun.castShadow=true;sun.shadow.mapSize.set(MOBILE.matches?1024:2048,MOBILE.matches?1024:2048);
+var sc=sun.shadow.camera;sc.left=-32;sc.right=32;sc.top=32;sc.bottom=-32;sc.near=1;sc.far=120;sun.shadow.bias=-0.0008;
+scene.add(sun);scene.add(sun.target);
+
+
+// ---------- 時段與光線 ----------
+// 現實 1 秒＝遊戲 1 分鐘（DAY.minPerSec）。早上 06:00、下午 12:00、晚上 18:00 出發。
+// 白天最亮；傍晚太陽變低變橘；天黑後整體變暗、開車燈。晚上信號煙看不到，改成傷者的閃光。
+var DAY={scoutMult:3,minPerSec:0.5,starts:[360,720,1080],names:['早上','下午','晚上']};
+var clockMin=360,startMin=360,DAYK=1;   // DAYK＝亮度 0～1
+function fmtClock(m){m=((Math.round(m)%1440)+1440)%1440;var h=Math.floor(m/60),mm=m%60;return (h<10?'0':'')+h+':'+(mm<10?'0':'')+mm;}
+var COL=function(h){return new THREE.Color(h);},cTmp=new THREE.Color(),cTmp2=new THREE.Color();
+var SKY={day:['#34304b','#5e4a63','#a8706a','#dfa06c'],dusk:['#2b2250','#7a3f5a','#d9694a','#ffb15a'],night:['#04050e','#0a0e25','#131939','#1d2447']};
+function mixHex(a,b,t){var A=COL(a),B=COL(b);A.lerp(B,t);return '#'+A.getHexString();}
+var lightSig='';
+function applyLighting(min){
+  var h=((min/60)%24+24)%24,k,warm;
+  if(h<4.5||h>=20.5)k=0.12;else if(h<5.8)k=0.12+0.88*ss(4.5,5.8,h);else if(h<16.5)k=1;else if(h<19)k=1-0.8*ss(16.5,19,h);else k=0.2-0.08*ss(19,20.5,h);
+  warm=Math.max(ss(16,17.5,h)*(1-ss(19,20.5,h)),(1-ss(5.2,6.5,h))*ss(4.5,5.2,h));
+  DAYK=k;
+  var fr=clamp((h-5.5)/13.5,0,1),el=k>0.15?0.12+1.1*Math.sin(Math.PI*fr):0.9,az=k>0.15?-0.8+fr*1.9:0.5;
+  SUNDIR.set(Math.cos(el)*Math.cos(az),Math.sin(el),Math.cos(el)*Math.sin(az)).multiplyScalar(36);
+  cTmp.set(0xfff0d8).lerp(cTmp2.set(0xff8f45),warm);cTmp.lerp(cTmp2.set(0x6a7bb0),1-k);sun.color.copy(cTmp);
+  sun.intensity=0.1+0.66*k;
+  hemi.intensity=0.24+0.36*k;
+  cTmp.set(0xffe6cc).lerp(cTmp2.set(0xffb98a),warm);cTmp.lerp(cTmp2.set(0x2a3a70),1-k);hemi.color.copy(cTmp);
+  hemi.groundColor.set(0x10142a).lerp(cTmp2.set(0x3d3450),k);
+  if(car.spot){var hl=clamp((0.7-k)/0.5,0,1);car.spot.intensity=2.6*hl;car.cone.material.opacity=0.17*hl;car.cone.visible=hl>0.02;}
+  var sig=Math.round(k*40)+'/'+Math.round(warm*40);
+  if(sig!==lightSig){lightSig=sig;
+    var out=[];for(var n=0;n<4;n++){var base=mixHex(SKY.day[n],SKY.dusk[n],warm);out.push(mixHex(SKY.night[n],base,k));}
+    document.body.style.backgroundImage='linear-gradient(180deg,'+out[0]+' 0%,'+out[1]+' 38%,'+out[2]+' 72%,'+out[3]+' 100%)';
+  }
+}
+var worldGroup=new THREE.Group();scene.add(worldGroup);
+var scoutGroup=new THREE.Group();scene.add(scoutGroup);
+var houses=[],targetObj=null,townPillar=null;
+
+function col(hex,m){var c=new THREE.Color(hex);c.multiplyScalar(m);return c;}
+function hash(i,j){var h=Math.sin(i*127.1+j*311.7)*43758.5453;return h-Math.floor(h);}
+
+function buildWorld(){
+  while(worldGroup.children.length){var o=worldGroup.children.pop();o.traverse(function(c){if(c.geometry)c.geometry.dispose();if(c.material&&c.material.dispose)c.material.dispose();});}
+  houses=[];
+  // terrain
+  var SUB=BIG?3:5,M=N*SUB,cs=TILE/SUB,hs=new Float32Array((M+1)*(M+1)),a,b;
+  for(a=0;a<=M;a++)for(b=0;b<=M;b++)hs[a*(M+1)+b]=groundH(a*cs-HALF,b*cs-HALF);
+  var pos=[],cols=[],side=new THREE.Color(0x6b4f3b),qSteep=new Float32Array(M*M),qH=new Float32Array(M*M);
+  function P(a,b){return [a*cs-HALF,hs[a*(M+1)+b],b*cs-HALF];}
+  for(a=0;a<M;a++)for(b=0;b<M;b++){
+    var ti=Math.floor(a/SUB),tj=Math.floor(b/SUB),id=idx(ti,tj);
+    var p00=P(a,b),p10=P(a+1,b),p01=P(a,b+1),p11=P(a+1,b+1);
+    var hmin=Math.min(p00[1],p10[1],p01[1],p11[1]),hmax=Math.max(p00[1],p10[1],p01[1],p11[1]);
+    var steep=(hmax-hmin)/cs;
+    var base=new THREE.Color(SURF[W.surf[id]].color);
+    base.multiplyScalar((0.9+hash(ti,tj)*0.14)*(BIG?0.8+Math.min(W.level[id]/(6*LS),1.6)*0.45:0.92+W.level[id]*0.025));   // 大地圖高處更亮，山形讀得出來
+    if(W.surf[id]==='rock'||W.surf[id]==='gravel')base.multiplyScalar(0.8+0.4*hash(a*3+1,b*7+2));   // 岩地：每塊明暗不同，看起來粗糙
+    else if(W.surf[id]==='mud')base.multiplyScalar(0.85+0.2*hash(a,b));
+    if(steep>0.3)base.lerp(side,clamp((steep-0.3)*1.6,0,0.7));
+    [p00,p01,p10,p10,p01,p11].forEach(function(p){pos.push(p[0],p[1],p[2]);cols.push(base.r,base.g,base.b);});
+    qSteep[a*M+b]=steep;qH[a*M+b]=(p00[1]+p10[1]+p01[1]+p11[1])/4;
+  }
+  // 入門車過不去的邊緣（大地圖）：一般鏡頭下一眼就看得出來。坡度大到爬不上去的面塗成灰色岩壁；
+  // 壁下（低的那一側）壓一圈深色當陰影；壁頂邊緣撒一排小石頭
+  var rockPos=[];
+  if(BIG){
+    function setQ(q,r,g,bl){for(var v=0;v<6;v++){var o=(q*6+v)*3;cols[o]=r;cols[o+1]=g;cols[o+2]=bl;}}
+    var WK=W.wallK;
+    function isWall(q){return qSteep[q]>WK;}
+    // 懸崖路：只有「不在路格上」的陡面才是峭壁面（爬不上）；路格內被地面圓滑過渡出來的斜坡（開得上去）不算，維持平滑漸層
+    function isFace(q){if(!isWall(q))return false;if(!W.cl)return true;var fa=(q/M)|0,fb=q%M;return !W.roadTile[idx(Math.floor(fa/SUB),Math.floor(fb/SUB))];}
+    var rng=mulberry32(W.seed^0x3c5);
+    for(var qa=0;qa<M;qa++)for(var qb=0;qb<M;qb++){
+      var q=qa*M+qb,nb=[qa>0?q-M:-1,qa<M-1?q+M:-1,qb>0?q-1:-1,qb<M-1?q+1:-1];
+      if(isFace(q)){
+        var t=clamp((qSteep[q]-WK)/0.08,0,1),sh=0.8+((qa*7+qb*13)%5)*0.05;
+        if(W.cl){   // 峭壁：橫向岩層（每 0.75 m 一層、每層亮暗不同）加直向條紋，整體比斜坡深一階
+          var band=Math.floor(qH[q]/0.75),bf=0.6+0.4*hash(band,7),vf=0.85+0.3*hash(Math.floor((qa+qb)/2),11),mt2=0.8+0.4*hash(qa*3+1,qb*5+2),sh2=sh*bf*vf*mt2;
+          setQ(q,0.5*sh2,0.42*sh2,0.37*sh2);   // 底色和斜坡的棕色相近，只深約一階；靠岩層條紋、方塊明暗和崖緣分
+        }else setQ(q,(cols[q*18]*(1-t)+0x5a/255*sh*t),(cols[q*18+1]*(1-t)+0x56/255*sh*t),(cols[q*18+2]*(1-t)+0x58/255*sh*t));
+      }else{
+        var below=false,crest=false;
+        for(var k2=0;k2<4;k2++){var n2=nb[k2];if(n2<0||!isFace(n2))continue;if(qH[n2]>qH[q]+0.02)below=true;else if(qH[n2]<qH[q]-0.02)crest=true;}
+        if(W.cl&&isWall(q)&&!below){var mt3=0.78+0.44*hash(qa*5+3,qb*3+1);setQ(q,cols[q*18]*mt3,cols[q*18+1]*mt3,cols[q*18+2]*mt3);}   // 能走的斜坡：方塊明暗隨機錯落
+        if(below)setQ(q,cols[q*18]*0.5,cols[q*18+1]*0.5,cols[q*18+2]*0.52);
+        else if(crest&&W.cl)setQ(q,Math.min(1,cols[q*18]*1.3+0.07),Math.min(1,cols[q*18+1]*1.28+0.06),Math.min(1,cols[q*18+2]*1.2+0.05));   // 崖緣：比旁邊亮一圈
+        else if(crest&&rng()<0.3&&rockPos.length<3000&&!(W.roadTile&&W.roadTile[Math.floor(qa/SUB)*N+Math.floor(qb/SUB)]))rockPos.push(qa*cs-HALF+cs*(0.2+rng()*0.6),qH[q],qb*cs-HALF+cs*(0.2+rng()*0.6),0.28+rng()*0.4);
+      }
+    }
+  }
+  var slopeG=[],slopeT=[];   // 懸崖路：路格內能走的斜坡（陡度 ≥0.10 的方塊）撒碎石和小草叢，峭壁面保持光禿
+  if(W.cl&&BIG){
+    var rng3=mulberry32(W.seed^0x77);
+    for(var sa=0;sa<M;sa++)for(var sb=0;sb<M;sb++){
+      var sq=sa*M+sb;if(qSteep[sq]<0.10||!W.roadTile[idx(Math.floor(sa/SUB),Math.floor(sb/SUB))])continue;
+      if(rng3()>0.3||slopeG.length+slopeT.length>900)continue;
+      var sx3=(sa+rng3())*cs-HALF,sz3=(sb+rng3())*cs-HALF,sy3=groundH(sx3,sz3);
+      if(rng3()<0.5)slopeG.push({x:sx3,y:sy3+0.06,z:sz3,r:rng3()*6.28,s:0.12+rng3()*0.2});
+      else slopeT.push({x:sx3,y:sy3,z:sz3,r:rng3()*6.28,s:0.35+rng3()*0.35,g:0.85+rng3()*0.3});
+    }
+  }
+  var g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+  g.setAttribute('color',new THREE.Float32BufferAttribute(cols,3));
+  g.computeVertexNormals();
+  var terrain=new THREE.Mesh(g,new THREE.MeshLambertMaterial({vertexColors:true}));
+  terrain.receiveShadow=true;worldGroup.add(terrain);
+  function mergeInst(baseGeo,list,colorOf,sc){
+    var pa=baseGeo.attributes.position,rp=[],rc=[],mt=new THREE.Matrix4(),vv=new THREE.Vector3();
+    list.forEach(function(it,ix){mt.makeRotationY(it.r);mt.scale(new THREE.Vector3(sc[0]*it.s,sc[1]*it.s,sc[2]*it.s));var cl3=colorOf(it,ix);
+      for(var iv=0;iv<pa.count;iv++){vv.set(pa.getX(iv),pa.getY(iv),pa.getZ(iv)).applyMatrix4(mt);rp.push(vv.x+it.x,vv.y+it.y,vv.z+it.z);rc.push(cl3[0],cl3[1],cl3[2]);}});
+    var mg=new THREE.BufferGeometry();mg.setAttribute('position',new THREE.Float32BufferAttribute(rp,3));mg.setAttribute('color',new THREE.Float32BufferAttribute(rc,3));mg.computeVertexNormals();
+    return new THREE.Mesh(mg,new THREE.MeshLambertMaterial({vertexColors:true,flatShading:true}));
+  }
+  if(slopeG.length)worldGroup.add(mergeInst(new THREE.IcosahedronGeometry(1,0),slopeG,function(){return [0.66,0.63,0.58];},[1.4,0.35,1]));   // 碎石：小、扁、淺色
+  if(slopeT.length){   // 小草叢：三根小錐一束，綠色
+    var tl=[];slopeT.forEach(function(t){for(var u=0;u<3;u++)tl.push({x:t.x+(u-1)*0.18*t.s,y:t.y+0.25*t.s,z:t.z+((u*5)%3-1)*0.15*t.s,r:t.r+u,s:t.s*(0.7+0.15*u),g:t.g});});
+    worldGroup.add(mergeInst(new THREE.ConeGeometry(0.4,1,5).toNonIndexed(),tl,function(it){return [0.34*it.g,0.5*it.g,0.26*it.g];},[0.5,0.9,0.5]));
+  }
+  if(rockPos.length){   // 崖頂石頭：全部合成一個網格
+    var ig=new THREE.IcosahedronGeometry(1,0),ia=ig.attributes.position,rp=[],rc=[],mt=new THREE.Matrix4(),vv=new THREE.Vector3();
+    for(var rq=0;rq<rockPos.length;rq+=4){
+      mt.makeRotationY(rq*1.7);mt.scale(new THREE.Vector3(rockPos[rq+3]*1.3,rockPos[rq+3],rockPos[rq+3]*1.1));
+      var cr=0.55+((rq/4)%3)*0.06;
+      for(var iv=0;iv<ia.count;iv++){vv.set(ia.getX(iv),ia.getY(iv),ia.getZ(iv)).applyMatrix4(mt);rp.push(vv.x+rockPos[rq],vv.y+rockPos[rq+1]+rockPos[rq+3]*0.4,vv.z+rockPos[rq+2]);rc.push(cr,cr*0.97,cr*0.92);}
+    }
+    var rg=new THREE.BufferGeometry();rg.setAttribute('position',new THREE.Float32BufferAttribute(rp,3));rg.setAttribute('color',new THREE.Float32BufferAttribute(rc,3));rg.computeVertexNormals();
+    var rm=new THREE.Mesh(rg,new THREE.MeshLambertMaterial({vertexColors:true}));rm.castShadow=true;worldGroup.add(rm);
+  }
+  // diorama skirt
+  var sp=[],scol=[],top=new THREE.Color(0x6e5341),bot=new THREE.Color(0x2c2432),BASE=-3.2;
+  function wall(pa,pb){
+    [[pa,1],[pb,1],[pa,0],[pb,1],[pb,0],[pa,0]].forEach(function(e){var p=e[0],c=e[1]?top:bot;sp.push(p[0],e[1]?p[1]:BASE,p[2]);scol.push(c.r,c.g,c.b);});
+  }
+  for(a=0;a<M;a++){wall(P(a,0),P(a+1,0));wall(P(a+1,M),P(a,M));wall(P(0,a+1),P(0,a));wall(P(M,a),P(M,a+1));}
+  var sg=new THREE.BufferGeometry();sg.setAttribute('position',new THREE.Float32BufferAttribute(sp,3));sg.setAttribute('color',new THREE.Float32BufferAttribute(scol,3));sg.computeVertexNormals();
+  worldGroup.add(new THREE.Mesh(sg,new THREE.MeshLambertMaterial({vertexColors:true,side:THREE.DoubleSide})));
+  // water
+  var wp=[],E=TILE*0.54,i,j;
+  for(i=0;i<N;i++)for(j=0;j<N;j++){if(W.surf[idx(i,j)]!=='water')continue;var c=tileCenter(i,j),y=-0.07;
+    wp.push(c[0]-E,y,c[1]-E, c[0]-E,y,c[1]+E, c[0]+E,y,c[1]-E, c[0]+E,y,c[1]-E, c[0]-E,y,c[1]+E, c[0]+E,y,c[1]+E);}
+  if(wp.length){var wg=new THREE.BufferGeometry();wg.setAttribute('position',new THREE.Float32BufferAttribute(wp,3));wg.computeVertexNormals();
+    worldGroup.add(new THREE.Mesh(wg,new THREE.MeshPhongMaterial({color:0x6a9aa0,transparent:true,opacity:0.72,shininess:80,specular:0xffd9a8,depthWrite:false})));}
+  // trees
+  var trunkG=new THREE.CylinderGeometry(0.12,0.16,0.7,5),crownG=new THREE.ConeGeometry(0.85,1.9,6),crownG2=new THREE.ConeGeometry(0.62,1.3,6);
+  var trunkM=new THREE.MeshLambertMaterial({color:0x5a4030});
+  W.trees.forEach(function(t){
+    var gr=new THREE.Group(),y=tH(t.i,t.j);
+    var cm=new THREE.MeshLambertMaterial({color:col(0x3f5b3c,0.85+hash(t.i,t.j)*0.35)});
+    var tr=new THREE.Mesh(trunkG,trunkM);tr.position.y=0.35;
+    var c1=new THREE.Mesh(crownG,cm);c1.position.y=1.45;
+    var c2=new THREE.Mesh(crownG2,cm);c2.position.y=2.25;
+    [tr,c1,c2].forEach(function(m){m.castShadow=true;gr.add(m);});
+    gr.position.set(t.x,y,t.z);gr.scale.setScalar(t.s);worldGroup.add(gr);t.y=y;
+  });
+  // 岩石和倒木
+  var rockG=new THREE.IcosahedronGeometry(1,0),rockM=new THREE.MeshLambertMaterial({color:0x8a8178}),logG=new THREE.CylinderGeometry(0.42,0.48,3.4,7),logM=new THREE.MeshLambertMaterial({color:0x6e4a30});
+  (W.clAnchors||[]).forEach(function(a){var m=new THREE.Mesh(rockG,rockM);m.scale.set(1.5*a.s,1.2*a.s,1.2*a.s);m.rotation.y=a.r;m.position.set(a.x,groundH(a.cx,a.cz)+0.5*a.s,a.z);m.castShadow=true;m.receiveShadow=true;worldGroup.add(m);});   // 懸崖路的絞盤錨點：山壁腳的大石頭（跟路面同高）
+  W.rocks.forEach(function(r){var m=new THREE.Mesh(rockG,rockM);m.scale.set(1.5*r.s,1.0*r.s,1.2*r.s);m.rotation.y=r.r;m.position.set(r.x,tH(r.i,r.j)+0.45*r.s,r.z);m.castShadow=true;m.receiveShadow=true;worldGroup.add(m);});
+  if(W.clDecor&&W.clDecor.length){   // 懸崖路：碎石（裝飾、沒有碰撞）
+    var dg=new THREE.IcosahedronGeometry(1,0),dm=new THREE.MeshLambertMaterial({color:0xa8a095,flatShading:true});
+    W.clDecor.forEach(function(d){var m=new THREE.Mesh(dg,dm);m.scale.set(d.s*1.4,d.s*0.35,d.s);m.rotation.y=d.r;m.position.set(d.x,groundH(d.x,d.z)+d.s*0.15,d.z);worldGroup.add(m);});
+  }
+  W.logs.forEach(function(l){var m=new THREE.Mesh(logG,logM);m.scale.setScalar(l.s);m.rotation.set(0,l.r,Math.PI/2);m.position.set(l.x,tH(l.i,l.j)+0.5*l.s,l.z);m.castShadow=true;worldGroup.add(m);});
+  // houses
+  var bodyM=new THREE.MeshLambertMaterial({color:0xd3c3aa}),roofM=new THREE.MeshLambertMaterial({color:0x7c4a3a});
+  HOUSES.forEach(function(h,n){
+    var gr=new THREE.Group(),c=tileCenter(h[0],h[1]);
+    var body=new THREE.Mesh(new THREE.BoxGeometry(1.5,1.05,1.5),bodyM);body.position.y=0.52;
+    var roof=new THREE.Mesh(new THREE.ConeGeometry(1.25,0.85,4),roofM);roof.position.y=1.47;roof.rotation.y=Math.PI/4;
+    var winM=new THREE.MeshLambertMaterial({color:0x2f2a2a,emissive:0x000000});
+    var w1=new THREE.Mesh(new THREE.BoxGeometry(0.38,0.3,1.54),winM);w1.position.y=0.6;
+    var w2=new THREE.Mesh(new THREE.BoxGeometry(1.54,0.3,0.38),winM);w2.position.y=0.6;
+    [body,roof,w1,w2].forEach(function(m){m.castShadow=true;m.receiveShadow=true;gr.add(m);});
+    var lamp=new THREE.PointLight(0xffb866,0,6);lamp.position.set(0,1.2,0);gr.add(lamp);
+    gr.scale.setScalar(TILE/2);gr.position.set(c[0],W.L0*STEP,c[1]);worldGroup.add(gr);
+    houses.push({win:winM,lamp:lamp});
+  });
+  // town pillar
+  var tc=tileCenter(1.5,1.5);
+  townPillar=new THREE.Mesh(new THREE.CylinderGeometry(0.7,0.7,44,14,1,true),new THREE.MeshBasicMaterial({color:0xffc27a,transparent:true,opacity:0.12,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide}));
+  townPillar.position.set(tc[0],W.L0*STEP+22,tc[1]);townPillar.visible=false;worldGroup.add(townPillar);   // 舊的光柱不用了（回家靠上方的方位帶）
+  // hiker
+  var t=W.target,tcp=tileCenter(t.i,t.j),ty=tH(t.i,t.j);
+  targetObj=new THREE.Group();
+  var jacket=new THREE.Mesh(new THREE.CylinderGeometry(0.22,0.28,0.85,8),new THREE.MeshLambertMaterial({color:0x3f6f9f}));jacket.position.y=0.45;
+  var head=new THREE.Mesh(new THREE.SphereGeometry(0.19,10,8),new THREE.MeshLambertMaterial({color:0xe2b58f}));head.position.y=1.05;
+  var pack=new THREE.Mesh(new THREE.BoxGeometry(0.4,0.5,0.22),new THREE.MeshLambertMaterial({color:0xd8743e}));pack.position.set(0,0.55,-0.25);
+  var arm=new THREE.Mesh(new THREE.BoxGeometry(0.09,0.55,0.09),new THREE.MeshLambertMaterial({color:0x3f6f9f}));arm.position.set(0.3,1.05,0);
+  [jacket,head,pack,arm].forEach(function(m){m.castShadow=true;targetObj.add(m);});
+  targetObj.userData.arm=arm;
+  targetObj.position.set(tcp[0]+0.4,ty,tcp[1]+0.4);worldGroup.add(targetObj);
+  W.targetPos={x:tcp[0]+0.4,y:ty,z:tcp[1]+0.4};
+  buildLandmarks();
+  buildSmoke();buildTracks();
+  updateHouses();
+}
+
+// ---------- 地標（簡單幾何，擺在目標附近，對得上無線電的描述） ----------
+function lm(geo,color,x,y,z){var m=new THREE.Mesh(geo,new THREE.MeshLambertMaterial({color:color}));m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;return m;}
+var LANDMARK={
+  tower:function(g){   // 水塔：四隻腳＋灰藍水槽＋圓錐頂，約 5 公尺高
+    for(var a=0;a<4;a++){g.add(lm(new THREE.CylinderGeometry(0.1,0.12,3.2,6),0x6d6358,(a%2?1:-1)*0.8,1.6,(a<2?1:-1)*0.8));}
+    g.add(lm(new THREE.CylinderGeometry(1.3,1.3,1.9,14),0x9fb0b8,0,4.1,0));
+    g.add(lm(new THREE.ConeGeometry(1.5,0.9,14),0x6f7f87,0,5.5,0));
+  },
+  bigTree:function(g){ // 比一般樹大兩倍的樹
+    g.add(lm(new THREE.CylinderGeometry(0.28,0.38,1.6,6),0x5a4030,0,0.8,0));
+    g.add(lm(new THREE.ConeGeometry(1.9,3.4,7),0x4f7a46,0,3.1,0));
+    g.add(lm(new THREE.ConeGeometry(1.4,2.6,7),0x5b8a50,0,4.9,0));
+  },
+  hut:function(g){     // 紅屋頂小屋
+    g.add(lm(new THREE.BoxGeometry(2.8,1.8,2.4),0xe3d6bd,0,0.9,0));
+    var r=lm(new THREE.ConeGeometry(2.6,1.5,4),0xc4402f,0,2.55,0);r.rotation.y=Math.PI/4;g.add(r);
+  },
+  logs:function(g){    // 一堆木頭：下排 3 根、上排 2 根，圓柱躺平
+    [[-0.5,0.22],[0,0.22],[0.5,0.22],[-0.25,0.62],[0.25,0.62]].forEach(function(p){
+      var m=lm(new THREE.CylinderGeometry(0.22,0.22,2,7),0x8a5c3a,p[0],p[1],0);m.rotation.x=Math.PI/2;g.add(m);});
+  },
+  windmill:function(g){// 風車：細塔＋四片葉子（會慢慢轉）
+    g.add(lm(new THREE.CylinderGeometry(0.25,0.5,4.4,8),0xe8e2d6,0,2.2,0));
+    var hub=new THREE.Group();hub.position.set(0,4.4,0.5);
+    for(var a=0;a<4;a++){var arm=new THREE.Group();arm.rotation.z=a*Math.PI/2;arm.add(lm(new THREE.BoxGeometry(0.35,2.2,0.08),0xf4efe4,0,1.2,0));hub.add(arm);}
+    g.add(hub);g.userData.hub=hub;
+  },
+  whiteRock:function(g){// 白色大石頭
+    var r=lm(new THREE.IcosahedronGeometry(1.5,0),0xe9e6df,0,0.9,0);r.scale.set(1.2,0.85,1);g.add(r);
+  },
+  lookout:function(g){ // 瞭望台：四根高腳＋平台＋小屋頂
+    for(var a=0;a<4;a++){g.add(lm(new THREE.CylinderGeometry(0.14,0.18,4,6),0x7a5a3c,(a%2?1:-1)*0.95,2,(a<2?1:-1)*0.95));}
+    g.add(lm(new THREE.BoxGeometry(2.6,0.2,2.6),0x9a7650,0,4.05,0));
+    var r=lm(new THREE.ConeGeometry(2.0,1.0,4),0x6a4a35,0,5.3,0);r.rotation.y=Math.PI/4;g.add(r);
+  },
+  tent:function(g){    // 黃色帳篷
+    var t=lm(new THREE.ConeGeometry(1.6,1.5,4),0xf2c744,0,0.75,0);t.rotation.y=Math.PI/4;t.scale.set(1,1,1.4);g.add(t);
+  }
+};
+var landmarks=[];
+var LM_NAMES=['tower','bigTree','hut','logs','windmill','whiteRock','lookout','tent'];
+function buildLandmarks(){
+  landmarks=[];
+  var tp=W.targetPos,rnd=mulberry32(W.seed^0x5bd1),used=[],lmS=BIG?2:1,rs=BIG?1:0.25;   // 大地圖地標放大 2 倍；小地圖距離縮成 1/4
+  function okSpot(x,z,gap){
+    var ti=tileOf(x,z);if(ti<0||W.surf[ti]==='water'||W.solid[ti]||inTown(Math.floor(ti/N),ti%N))return false;
+    return !used.some(function(u){return Math.hypot(u[0]-x,u[1]-z)<gap;});
+  }
+  function put(name,x,z){
+    var g=new THREE.Group();LANDMARK[name](g);g.scale.setScalar(lmS);
+    g.position.set(x,groundH(x,z),z);g.rotation.y=rnd()*Math.PI*2;
+    worldGroup.add(g);landmarks.push(g);used.push([x,z]);
+  }
+  // 一組地標：每個東西在中心 rmin～rmax 公尺外，候選點裡挑地勢最高的（從低窪裡抬頭看得到）
+  function cluster(parts,cx,cz,rmin,rmax){
+    parts.forEach(function(name){
+      var best=null,bh=-1e9;
+      for(var tr=0;tr<24;tr++){
+        var ang=rnd()*Math.PI*2,r=(rmin+rnd()*(rmax-rmin))*rs,qx=cx+Math.cos(ang)*r,qz=cz+Math.sin(ang)*r;
+        if(!okSpot(qx,qz,8*lmS*rs+2))continue;
+        var h=groundH(qx,qz);if(h>bh){bh=h;best=[qx,qz];}
+      }
+      if(best)put(name,best[0],best[1]);
+    });
+  }
+  // 部分符合的描述：mode 0 少最後一樣、1 最後一樣換成別的、2 第一樣換掉
+  function variant(parts,mode){
+    var other=LM_NAMES.filter(function(n){return parts.indexOf(n)<0;}),pick=other[Math.floor(rnd()*other.length)];
+    if(mode===0)return parts.slice(0,-1);
+    if(mode===1)return parts.slice(0,-1).concat([pick]);
+    return [pick].concat(parts.slice(1));
+  }
+  cluster(W.scenario.parts,tp.x,tp.z,30,80);   // 要找的那組：目標旁邊不放，離目標 30～80 m
+  // 近距離干擾：離目標 60～100 公尺，只有聽清楚完整描述才分得出來
+  for(var n=0;n<DP.nearDecoys;n++){
+    for(var tr=0;tr<40;tr++){
+      var ang=rnd()*Math.PI*2,r=(60+rnd()*40)*rs,cx=tp.x+Math.cos(ang)*r,cz=tp.z+Math.sin(ang)*r;
+      if(!okSpot(cx,cz,10))continue;
+      cluster(variant(W.scenario.parts,n%3),cx,cz,20,50);break;
+    }
+  }
+  // 散落各處：面積每 80×80 公尺一組。簡單版單獨一件；其他難度一半是部分符合的組合
+  var decoys=Math.round(MAP_M*MAP_M/6400);
+  for(n=0;n<decoys;n++){
+    for(tr=0;tr<20;tr++){
+      var qx=(rnd()-0.5)*(MAP_M-20),qz=(rnd()-0.5)*(MAP_M-20);
+      if(Math.hypot(qx-tp.x,qz-tp.z)<40*rs||!okSpot(qx,qz,6))continue;
+      if(DP.partialDecoys&&rnd()<0.5){var sc=SCENARIOS[Math.floor(rnd()*SCENARIOS.length)];cluster(variant(sc.parts,Math.floor(rnd()*3)),qx,qz,15,40);}
+      else put(LM_NAMES[Math.floor(rnd()*LM_NAMES.length)],qx,qz);
+      break;
+    }
+  }
+}
+// ---------- 信號煙：目標頭上一縷煙，雲朵慢慢往上飄散；是否看得到由 radioUpdate 決定（RS.smoke） ----------
+var smokeObj=null;
+function buildSmoke(){
+  smokeObj=new THREE.Group();smokeObj.userData.puffs=[];
+  for(var n=0;n<9;n++){
+    var pf=new THREE.Mesh(new THREE.SphereGeometry(1,8,6),new THREE.MeshBasicMaterial({color:0xe6dfd6,transparent:true,opacity:0.5,depthWrite:false,fog:false}));
+    smokeObj.add(pf);smokeObj.userData.puffs.push(pf);
+  }
+  var tp=W.targetPos;smokeObj.position.set(tp.x-0.5,tp.y+0.6,tp.z);smokeObj.visible=false;worldGroup.add(smokeObj);
+  // 晚上：傷者的手電筒閃光（一閃一閃的光點）
+  flashObj=new THREE.Group();
+  flashObj.add(new THREE.Mesh(new THREE.SphereGeometry(0.5,10,8),new THREE.MeshBasicMaterial({color:0xfff6c8,fog:false})));
+  flashObj.add(new THREE.Mesh(new THREE.SphereGeometry(2.6,12,10),new THREE.MeshBasicMaterial({color:0xffe9a0,transparent:true,opacity:0.5,depthWrite:false,blending:THREE.AdditiveBlending,fog:false})));
+  flashObj.position.set(tp.x-0.4,tp.y+1.5,tp.z);flashObj.visible=false;worldGroup.add(flashObj);
+}
+var flashObj=null;
+function updateSmoke(){
+  if(!smokeObj)return;
+  var night=DAYK<0.55;
+  if(flashObj)flashObj.visible=night&&!!RS.smoke&&!car.aboard&&((clockMin/DAY.minPerSec)%1.7)<0.3;   // 晚上：閃光，每 1.7 秒亮 0.3 秒
+  smokeObj.visible=!night&&!!RS.smoke&&!car.aboard;
+  if(!smokeObj.visible)return;
+  var ps=smokeObj.userData.puffs,sk=BIG?1:0.5;
+  for(var n=0;n<ps.length;n++){
+    var f=((simT*0.12+n/ps.length)%1);
+    ps[n].position.set(Math.sin(f*5+n)*0.9*f*sk*4,f*16*sk+0.5,Math.cos(f*4+n)*0.7*f*sk*4);
+    ps[n].scale.setScalar((0.7+f*2.6)*sk);
+    ps[n].material.opacity=RADIO.smokeAlpha*(1-f)*Math.min(1,f*8);
+  }
+}
+// ---------- 她的舊車痕：從小鎮附近出發，往目標區域延伸（停在離傷者還很遠的地方）。兩條平行深色胎痕，貼著地形 ----------
+// 有時（約一半的地圖）路上有一道「只能往下開的坎」：往下 6 層（0.68 m）入門車開得下去，回程往上爬不上去，要繞路
+function buildTracks(){
+  var T=W.track,rnd=mulberry32(W.seed^0x7a11),pos=[];
+  function wob(a){return T.amp*Math.sin(a/22+T.ph)+T.off;}
+  function pt(a,off){var w=wob(a)+off;return [T.sx+T.ux*a+T.vx*w,T.sz+T.uz*a+T.vz*w];}
+  var a=T.s0,on=true,left=14+rnd()*16,step=1.0,hw=0.27;
+  while(a<T.s1){
+    if(on){
+      for(var r=-1;r<=1;r+=2){
+        var p0=pt(a,r*0.7),p1=pt(a+step,r*0.7),dx=p1[0]-p0[0],dz=p1[1]-p0[1],dd=Math.hypot(dx,dz),nx=-dz/dd*hw,nz=dx/dd*hw;
+        var ti=tileOf(p0[0],p0[1]);if(ti<0||W.surf[ti]==='water'||W.surf[ti]==='town')continue;
+        var q=[[p0[0]+nx,p0[1]+nz],[p0[0]-nx,p0[1]-nz],[p1[0]+nx,p1[1]+nz],[p1[0]-nx,p1[1]-nz]].map(function(e){return [e[0],groundH(e[0],e[1])+0.07,e[1]];});
+        [q[0],q[1],q[2],q[2],q[1],q[3]].forEach(function(e){pos.push(e[0],e[1],e[2]);});
+      }
+    }
+    a+=step;left-=step;
+    if(left<=0){on=!on;left=on?(12+rnd()*18):(1.5+rnd()*2.5);}
+  }
+  if(!pos.length)return;
+  var g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+  worldGroup.add(new THREE.Mesh(g,new THREE.MeshBasicMaterial({color:0x34231a,transparent:true,opacity:0.55,depthWrite:false,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2})));
+}
+var rescued=0;
+function updateHouses(){houses.forEach(function(h,n){var on=n<rescued;h.win.color.setHex(on?0xffd28a:0x2f2a2a);h.win.emissive.setHex(on?0xffa84a:0x000000);h.lamp.intensity=on?1.1:0;});}
+
+// ---------- car ----------
+var car={x:0,z:0,th:0,v:0,bodyY:0,bodyVy:0,pitch:0,roll:0,prevPitch:0,stalled:false,winch:false,aboard:false,comfort:100,spin:0};
+// 地形對應模式：一次只能選一個（或都不選）。選對（草地不選）才正常速度；選錯極速剩 SLOW；河裡沒選「升高」會卡住，要用絞盤
+var mode=null;
+function curReq(){   // 車現在的位置要哪個模式（null＝什麼都不選）
+  var ws=wheelWorld(car.x,car.z,car.th),t;
+  for(var k=0;k<4;k++){t=tileOf(ws[k][0],ws[k][1]);if(t>=0&&W.surf[t]==='water')return 'river';}
+  t=tileOf(car.x,car.z);return t>=0?(MODE_OF[W.surf[t]]||null):null;
+}
+function stats(){
+  var lift=mode==='river',air=mode==='sand';
+  return{winch:true,step:LS,wade:0.9,r:0.42,lift:0,comfortMult:lift?0.5:1,K:lift?95:140,C:lift?14:20};
+}
+var WL=[[0.86,1.1],[-0.86,1.1],[0.86,-1.1],[-0.86,-1.1]];
+function wheelWorld(x,z,th){var c=Math.cos(th),s=Math.sin(th);return WL.map(function(w){return[x+w[0]*c+w[1]*s,z-w[0]*s+w[1]*c];});}
+function localToWorld(x,z,th,lx,lz){var c=Math.cos(th),s=Math.sin(th);return[x+lx*c+lz*s,z-lx*s+lz*c];}
+
+var carG=new THREE.Group();carG.rotation.order='YXZ';scene.add(carG);
+(function(){
+  function box(w,h,d,c,x,y,z,em){var m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshLambertMaterial({color:c,emissive:em||0}));m.position.set(x,y,z);m.castShadow=true;carG.add(m);return m;}
+  box(1.76,0.52,3.2,0xe2ab45,0,0,0);
+  box(1.56,0.6,1.7,0xebe0cb,0,0.55,-0.35);
+  box(1.46,0.42,0.06,0x2f3642,0,0.56,0.52);
+  box(1.58,0.3,1.2,0x2f3642,0,0.6,-0.4).scale.set(1.001,1,1);
+  box(1.44,0.08,1.44,0x3a322e,0,0.9,-0.35);
+  car.lightbar=box(1.0,0.13,0.22,0x6b2b22,0,0.95,0.32,0x220000);
+  box(1.82,0.26,0.26,0x3a322e,0,-0.12,1.66);
+  box(1.82,0.24,0.22,0x3a322e,0,-0.12,-1.66);
+  box(0.26,0.14,0.05,0xfff1c9,0.6,0.06,1.61,0xffd98a);
+  box(0.26,0.14,0.05,0xfff1c9,-0.6,0.06,1.61,0xffd98a);
+  var spare=new THREE.Mesh(new THREE.CylinderGeometry(0.38,0.38,0.22,12),new THREE.MeshLambertMaterial({color:0x2a2522}));spare.rotation.x=Math.PI/2;spare.position.set(0,0.22,-1.76);spare.castShadow=true;carG.add(spare);
+  var drum=new THREE.Mesh(new THREE.CylinderGeometry(0.13,0.13,0.8,10),new THREE.MeshLambertMaterial({color:0x8a8580}));drum.rotation.z=Math.PI/2;drum.position.set(0,-0.02,1.84);carG.add(drum);car.drum=drum;
+})();
+var wheels=[];
+(function(){
+  var tg=new THREE.CylinderGeometry(1,1,0.44,14);tg.rotateZ(Math.PI/2);
+  var hg=new THREE.CylinderGeometry(0.5,0.5,0.46,8);hg.rotateZ(Math.PI/2);
+  var tm=new THREE.MeshLambertMaterial({color:0x2a2522}),hm=new THREE.MeshLambertMaterial({color:0xbdb5a8});
+  for(var k=0;k<4;k++){var piv=new THREE.Group();var sp=new THREE.Group();var t=new THREE.Mesh(tg,tm);t.castShadow=true;var h=new THREE.Mesh(hg,hm);h.scale.set(1,1,1);sp.add(t);sp.add(h);piv.add(sp);scene.add(piv);wheels.push({piv:piv,spin:sp,tire:t,hub:h});}
+})();
+var rope=new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3()]),new THREE.LineBasicMaterial({color:0xf3e9d8}));
+rope.visible=false;scene.add(rope);
+var anchor=null;
+var anchorMark=new THREE.Mesh(new THREE.RingGeometry(0.9,1.25,24),new THREE.MeshBasicMaterial({color:0xffd27a,side:THREE.DoubleSide,depthTest:false,transparent:true,opacity:0.9}));anchorMark.rotation.x=-Math.PI/2;anchorMark.renderOrder=9;anchorMark.visible=false;scene.add(anchorMark);   // 選中的錨點：黃圈
+
+// ---------- 模式外觀（誇張、只是外觀；碰撞和物理照原本規則）----------
+// 洩氣：輪胎壓扁（高 0.6×）、往兩側鼓寬（1.4×）、車身下沉
+// 升高：車身抬高約 0.6 m，輪胎和車身之間露出避震支柱和彈簧
+// 低速檔：巨大攀岩胎（直徑 1.5×）、胎面長出很粗很深的凸塊
+// 差速鎖：前後軸各一根發琥珀光的鎖軸（兩端露出輪外）、車底打琥珀光，輪胎包上鏈條
+// 切換時用阻尼彈簧，約 0.3 秒，有點彈
+var vis={wr:1,ww:1,lift:0,lug:0,chain:0,axle:0};
+var visV={wr:0,ww:0,lift:0,lug:0,chain:0,axle:0};
+function visTarget(m){
+  return {wr:m==='sand'?0.6:m==='rock'?1.5:1, ww:m==='sand'?1.4:m==='rock'?1.15:1,
+          lift:m==='sand'?-0.17:m==='rock'?0.21:m==='river'?0.6:0, lug:m==='rock'?1:0, chain:m==='mud'?1:0, axle:m==='mud'?1:0};
+}
+(function(){
+  var lugM=new THREE.MeshLambertMaterial({color:0x4a423c}),chainM=new THREE.MeshLambertMaterial({color:0x8d877e});
+  var lugG=new THREE.BoxGeometry(0.5,0.3,0.2),linkG=new THREE.BoxGeometry(0.56,0.1,0.13),ringG=new THREE.TorusGeometry(1.0,0.09,6,20);ringG.rotateY(Math.PI/2);
+  wheels.forEach(function(w){
+    // 粗胎紋：16 塊凸塊，左右交錯、斜著放
+    var lg=new THREE.Group(),n,pv,b;
+    for(n=0;n<16;n++){pv=new THREE.Object3D();pv.rotation.x=n*Math.PI*2/16;b=new THREE.Mesh(lugG,lugM);b.position.set((n%2?0.1:-0.1),1.08,0);b.rotation.y=(n%2?0.35:-0.35);b.castShadow=true;pv.add(b);lg.add(pv);}
+    w.tire.add(lg);w.lugs=lg;
+    // 鏈條：兩圈環加斜交的鏈節（深色凸起格紋）
+    var cg=new THREE.Group();
+    [-0.14,0.14].forEach(function(x){var r=new THREE.Mesh(ringG,chainM);r.position.x=x;r.scale.set(1,1.03,1.03);cg.add(r);});
+    for(n=0;n<12;n++){pv=new THREE.Object3D();pv.rotation.x=n*Math.PI*2/12;b=new THREE.Mesh(linkG,chainM);b.position.set(0,1.04,0);b.rotation.y=(n%2?0.6:-0.6);pv.add(b);cg.add(pv);}
+    w.tire.add(cg);w.chain=cg;
+    lg.visible=false;cg.visible=false;
+  });
+  // 避震支柱＋彈簧（每個輪子一組，掛在車身上，露出多少看抬高多少）
+  var shaftM=new THREE.MeshLambertMaterial({color:0x9a948a}),coilM=new THREE.MeshLambertMaterial({color:0xe8b04a,emissive:0x331f00});
+  var shaftG=new THREE.CylinderGeometry(0.055,0.055,1,8),coilG=new THREE.TorusGeometry(0.15,0.04,6,12);coilG.rotateX(Math.PI/2);
+  car.struts=WL.map(function(wl){
+    var g=new THREE.Group(),sh=new THREE.Mesh(shaftG,shaftM),coils=[];
+    g.add(sh);for(var n=0;n<7;n++){var c=new THREE.Mesh(coilG,coilM);g.add(c);coils.push(c);}
+    g.position.set(wl[0]*1.14,0,wl[1]);g.visible=false;carG.add(g);return {g:g,sh:sh,coils:coils};
+  });
+  // 差速鎖軸：前後各一根，發琥珀光，兩端露出輪外；加車底的琥珀光
+  var axG=new THREE.CylinderGeometry(0.13,0.13,2.6,10);axG.rotateZ(Math.PI/2);
+  var haloG=new THREE.CylinderGeometry(0.26,0.26,2.5,10);haloG.rotateZ(Math.PI/2);
+  var capG=new THREE.SphereGeometry(0.24,10,8);
+  var axM=new THREE.MeshBasicMaterial({color:0xffc04a,fog:false}),haloM=new THREE.MeshBasicMaterial({color:0xffa81e,transparent:true,opacity:0.4,blending:THREE.AdditiveBlending,depthWrite:false});
+  car.axles=[1.1,-1.1].map(function(z){
+    var g=new THREE.Group();g.add(new THREE.Mesh(axG,axM));g.add(new THREE.Mesh(haloG,haloM));
+    [-1.3,1.3].forEach(function(x){var c=new THREE.Mesh(capG,axM);c.position.x=x;g.add(c);});
+    g.position.set(0,-0.32,z);g.visible=false;carG.add(g);return g;
+  });
+  car.axleLight=new THREE.PointLight(0xffa81e,0,8);car.axleLight.position.set(0,-0.9,0);carG.add(car.axleLight);
+})();
+// 車燈：天黑後車前打出光錐（聚光燈照地面＋半透明光錐讓遠眺視角看得到）
+(function(){
+  car.spot=new THREE.SpotLight(0xfff0c8,0,48,0.55,0.55,1.2);car.spot.position.set(0,0.3,1.7);
+  var tg=new THREE.Object3D();tg.position.set(0,-2,18);carG.add(tg);car.spot.target=tg;carG.add(car.spot);
+  var cg=new THREE.ConeGeometry(3.4,15,18,1,true);cg.rotateX(-Math.PI/2);cg.translate(0,0,1.7+7.5);
+  car.cone=new THREE.Mesh(cg,new THREE.MeshBasicMaterial({color:0xfff0c8,transparent:true,opacity:0,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide,fog:false}));
+  car.cone.visible=false;carG.add(car.cone);
+})();
+function updateModeVisual(dt){
+  var tg=visTarget(mode),k=280,c=11,h=Math.min(dt,1/30);
+  for(var key in vis){var a=k*(tg[key]-vis[key])-c*visV[key];visV[key]+=a*h;vis[key]+=visV[key]*h;}
+  var r=0.42*vis.wr;
+  wheels.forEach(function(w){
+    w.tire.scale.set(vis.ww,r,r);w.hub.scale.set(vis.ww,r,r);
+    var l=clamp(vis.lug,0,1.4),ch=clamp(vis.chain,0,1.4);
+    w.lugs.visible=l>0.03;w.lugs.scale.set(1,Math.max(l,0.01),Math.max(l,0.01));
+    w.chain.visible=ch>0.03;w.chain.scale.set(1,Math.max(ch,0.01),Math.max(ch,0.01));
+  });
+  // 避震支柱：車身離輪子多遠就露出多長
+  var hubY=-0.32-vis.lift+(r-0.42),top=-0.2,len=top-hubY,show=vis.lift>0.12;
+  car.struts.forEach(function(s){
+    s.g.visible=show;if(!show)return;
+    s.sh.scale.y=len;s.sh.position.y=(top+hubY)/2;
+    for(var n=0;n<s.coils.length;n++)s.coils[n].position.y=hubY+len*(n+0.5)/s.coils.length;
+  });
+  var ax=clamp(vis.axle,0,1.3);
+  car.axles.forEach(function(g){g.visible=ax>0.04;g.position.y=hubY;g.scale.set(1,Math.max(ax,0.01),Math.max(ax,0.01));});
+  car.axleLight.intensity=1.8*Math.max(0,ax);
+}
+
+function applyMods(){   // 模式變了：更新輪胎大小、按鈕亮暗
+  var st=stats();
+  car.drum.visible=true;
+  ['rock','sand','mud','river'].forEach(function(m){var b=$({rock:'tRock',sand:'tSand',mud:'tMud',river:'tRiver'}[m]);b.classList.toggle('on',mode===m);});
+  if(scouting)buildScout();
+}
+var MODE_NAME={rock:'低速檔',sand:'洩氣',mud:'差速鎖',river:'升高'};
+$('rewindBtn').onclick=function(){doRewind();};
+function setMode(m){mode=(mode===m)?null:m;applyMods();say(mode?'模式：'+MODE_NAME[mode]:'模式：全部關閉');}
+
+// ---------- particles ----------
+var parts=[],pGeo=new THREE.BoxGeometry(0.13,0.13,0.13);
+for(var q=0;q<80;q++){var pm=new THREE.Mesh(pGeo,new THREE.MeshLambertMaterial({color:0x5f4533,transparent:true}));pm.visible=false;scene.add(pm);parts.push({m:pm,life:0,max:1,vx:0,vy:0,vz:0,grow:0});}
+var smokeGeo=new THREE.IcosahedronGeometry(0.34,0),smoke=[];
+for(q=0;q<28;q++){var smm=new THREE.Mesh(smokeGeo,new THREE.MeshBasicMaterial({color:0xe8705e,transparent:true,depthWrite:false}));smm.visible=false;scene.add(smm);smoke.push({m:smm,life:0,max:1,vx:0,vy:0,vz:0,grow:1});}
+var pi=0,si=0;
+function emit(pool,which,x,y,z,color,vx,vy,vz,life,grow){var p=pool[which%pool.length];p.m.visible=true;p.m.position.set(x,y,z);p.m.material.color.setHex(color);p.vx=vx;p.vy=vy;p.vz=vz;p.life=life;p.max=life;p.grow=grow||0;p.m.scale.setScalar(1);}
+function stepParts(pool,dt,g){pool.forEach(function(p){if(p.life<=0){p.m.visible=false;return;}p.life-=dt;p.vy-=g*dt;p.m.position.x+=p.vx*dt;p.m.position.y+=p.vy*dt;p.m.position.z+=p.vz*dt;var t=p.life/p.max;p.m.material.opacity=clamp(t*1.4,0,g?1:0.55);if(p.grow)p.m.scale.setScalar(1+(1-t)*p.grow);});}
+
+// ---------- scout overlay ----------
+var scouting=false;
+function buildScout(){   // 勘查色層：只畫車子周圍約 40 m（10 格）。以車為基準：從車這裡開不到＝紅；開得到的照坡度綠＜15°、黃 ≥15°，≥25° 加斜紋；河谷另有水、泥、沙的顏色
+  while(scoutGroup.children.length){var o=scoutGroup.children.pop();o.geometry.dispose();o.material.dispose();}
+  var ct=tileOf(car.x,car.z);if(ct<0)return;
+  var ci=Math.floor(ct/N),cj=ct%N,RAD=10,pos=[],cols=[],bp=[],i,j;
+  function inR(i,j){return i>=0&&j>=0&&i<N&&j<N&&(i-ci)*(i-ci)+(j-cj)*(j-cj)<=RAD*RAD;}
+  var G=new THREE.Color(0x9cc46f),Y=new THREE.Color(0xe9d36a),Rd=new THREE.Color(0xe0664b),Wt=new THREE.Color(0x4aa3c4),Mu=new THREE.Color(0xb98655),Sa=new THREE.Color(0xf0dc94),Rk=new THREE.Color(0xb5bcc8),Dk=new THREE.Color(0x7a2d2d),Stripe=new THREE.Color(0x3a1d1d);
+  function quad(arr,carr,x0,z0,x1,z1,y,c){[[x0,z0],[x0,z1],[x1,z0],[x1,z0],[x0,z1],[x1,z1]].forEach(function(p){arr.push(p[0],y,p[1]);if(carr)carr.push(c.r,c.g,c.b);});}
+  // 以車為基準：從車所在的格子往外找（只在勘查範圍內），用和 check() 一樣的規則——往上 ≤ limUp、往下 ≤ limDown（大地圖）、不能是實心或太深的水。
+  // 找得到＝從這裡開得到 → 照坡度綠／黃；找不到＝紅。懸崖路另有規則，不用這個。
+  var reach=new Uint8Array(N*N),qq=[ct];reach[ct]=1;
+  while(qq.length){var c0=qq.shift(),i0=Math.floor(c0/N),j0=c0%N;
+    [[1,0],[-1,0],[0,1],[0,-1]].forEach(function(d){var ni=i0+d[0],nj=j0+d[1];if(!inR(ni,nj))return;var n=idx(ni,nj);if(reach[n]||W.solid[n]||W.depth[n]>0.9)return;
+      var rise=W.level[n]-W.level[c0];if(rise>W.limUp||(BIG&&-rise>W.limDown))return;reach[n]=1;qq.push(n);});}
+  function bar(arr,carr,ax,az,bx,bz,y,w,c){var dx=bx-ax,dz=bz-az,l=Math.hypot(dx,dz),nx=-dz/l*w,nz=dx/l*w;[[ax+nx,az+nz],[ax-nx,az-nz],[bx+nx,bz+nz],[bx+nx,bz+nz],[ax-nx,az-nz],[bx-nx,bz-nz]].forEach(function(p){arr.push(p[0],y,p[1]);carr.push(c.r,c.g,c.b);});}
+  for(i=0;i<N;i++)for(j=0;j<N;j++){
+    if(!inR(i,j))continue;var id=idx(i,j);if(W.solid[id])continue;
+    var s=W.surf[id],c,lv0=W.level[id],sl=0,d4=[[1,0],[-1,0],[0,1],[0,-1]];
+    d4.forEach(function(d){var ni=i+d[0],nj=j+d[1];if(ni>=0&&nj>=0&&ni<N&&nj<N){var df=Math.abs(W.level[idx(ni,nj)]-lv0);if(df>sl)sl=df;}});
+    var deg=Math.atan(sl*STEP/TILE)*180/Math.PI;
+    if(W.roadTile){   // 懸崖路：路格＝能走。看格子中心前後左右 1.5 m 的地面坡度；靠牆／崖的邊緣路格（斜坡）綠或黃；牆和崖才是紅
+      if(W.roadTile[id]){
+        var tc6=tileCenter(i,j),gx6=(groundH(tc6[0]+1.5,tc6[1])-groundH(tc6[0]-1.5,tc6[1]))/3,gz6=(groundH(tc6[0],tc6[1]+1.5)-groundH(tc6[0],tc6[1]-1.5))/3;
+        var deg6=Math.atan(Math.hypot(gx6,gz6))*180/Math.PI,edge6=false;
+        d4.forEach(function(d){var ni=i+d[0],nj=j+d[1];if(ni>=0&&nj>=0&&ni<N&&nj<N&&!W.roadTile[idx(ni,nj)])edge6=true;});
+        deg=deg6;c=edge6?(deg6>=25?Y:G):(deg6>=30?Rd:deg6>=15?Y:Rk);   // 路邊斜坡格：<25° 綠、≥25° 黃（側斜明顯、要慢）
+      }else c=Rd;
+    }
+    else if(W.cliffMask&&W.cliffMask[id])c=Dk;
+    else if(!reach[id])c=Rd;else if(deg>=15)c=Y;
+    else if(s==='water')c=Wt;else if(s==='mud')c=Mu;else if(s==='sand')c=Sa;else if(s==='rock'||s==='gravel')c=Rk;else c=G;
+    var cc=tileCenter(i,j),h=TILE*0.46,y=(s==='water'?-0.07:tH(i,j))+0.06;
+    quad(pos,cols,cc[0]-h,cc[1]-h,cc[0]+h,cc[1]+h,y,c);
+    if(deg>=25&&c!==Dk&&!W.roadTile){for(var q=-1;q<=1;q++)bar(pos,cols,cc[0]-h,cc[1]+q*h*0.9,cc[0]+h,cc[1]+q*h*0.9+h*0.9,y+0.02,0.22,Stripe);}   // 斜紋＝側坡危險
+    [[1,0],[0,1]].forEach(function(d){   // 爬不上的台階畫紅線
+      var i2=i+d[0],j2=j+d[1];if(!inR(i2,j2))return;
+      var dl=W.level[idx(i2,j2)]-W.level[id];if(Math.abs(dl)<=W.limUp)return;
+      var hiI=dl>0?i2:i,hiJ=dl>0?j2:j,yy=tH(hiI,hiJ)+0.08,w=0.13,e=TILE*0.46;
+      if(d[0]){var ex=(i+1)*TILE-HALF+(dl>0?w:-w);quad(bp,null,ex-w,cc[1]-e,ex+w,cc[1]+e,yy);}
+      else{var ez=(j+1)*TILE-HALF+(dl>0?w:-w);quad(bp,null,cc[0]-e,ez-w,cc[0]+e,ez+w,yy);}
+    });
+  }
+  var g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('color',new THREE.Float32BufferAttribute(cols,3));
+  scoutGroup.add(new THREE.Mesh(g,new THREE.MeshBasicMaterial({vertexColors:true,transparent:true,opacity:0.72,depthWrite:false,side:THREE.DoubleSide})));
+  if(bp.length){var bg=new THREE.BufferGeometry();bg.setAttribute('position',new THREE.Float32BufferAttribute(bp,3));scoutGroup.add(new THREE.Mesh(bg,new THREE.MeshBasicMaterial({color:0xff5a3c,side:THREE.DoubleSide})));}
+}
+function setScout(on){
+  scouting=on;scoutGroup.visible=on;if(on){buildScout();scoutT=0.3;}   // 解釋先拿掉（原本寫的「黃要低速檔」不對：爬坡上限跟模式無關）
+  setTog('tScout',on,on?'開':'');
+}
+
+// ---------- UI helpers ----------
+var toastT=0,toastMsg='';
+function say(msg,ms){var el=$('toast');if(msg!==toastMsg){el.textContent=msg;toastMsg=msg;}el.classList.add('show');toastT=(ms||1600)/1000;}
+function setTog(id,on,txt){var el=$(id);el.classList.toggle('on',!!on);var em=el.querySelector('em');if(em)em.textContent=txt;}
+
+// ---------- mission ----------
+var MK=MOBILE.matches?1.5:1,CAMOFF=MOBILE.matches?1.6*MK:0;   // 手機鏡頭拉遠倍率（車太大、看到的路面太少）
+var camHd=0,camLift=0,scoutK=0,scoutT=0;
+var playing=false,camA=Math.PI/4,camD=27*MK,camT=new THREE.Vector3(),flareT=0;
+function placeCar(){
+  var c=tileCenter(2,2),t=tileCenter(W.target.i,W.target.j);
+  car.x=c[0];car.z=c[1];car.v=0;car.stalled=false;
+  // 車頭朝外：背對小鎮（地圖角落），對著地圖中央的野外（Lu 定，2026-10-12）
+  car.th=W.cps&&W.cps.length?W.cps[0].th:Math.atan2(0-c[0],0-c[1]);
+  var st=stats();car.bodyY=groundH(car.x,car.z)+st.r+st.lift+0.32;car.bodyVy=0;
+}
+// 入門車（爬 1 層級的階、涉水 0.45 m）從小鎮用四方向走格子，走不走得到目標；樹、岩石、倒木、深水、溝崖都擋
+function reachable(w){
+  var goal=idx(w.target.i,w.target.j),seen=new Uint8Array(N*N),q=[idx(2,2)],DI=[1,-1,0,0],DJ=[0,0,1,-1];seen[q[0]]=1;
+  while(q.length){
+    var c=q.pop(),ci=(c/N)|0,cj=c%N;
+    for(var d=0;d<4;d++){
+      var ni=ci+DI[d],nj=cj+DJ[d];if(ni<0||nj<0||ni>=N||nj>=N)continue;
+      var n=idx(ni,nj);if(seen[n]||Math.abs(w.level[n]-w.level[c])>w.limUp)continue;
+      if(n===goal)return true;
+      if(w.solid[n]||w.depth[n]>0.9)continue;
+      seen[n]=1;q.push(n);
+    }
+  }
+  return false;
+}
+// 手機：任務文字開場顯示幾秒後收起，點左上的訊號格再展開
+var missT=0;
+function showMission(){var m=$('mission');m.classList.add('show');clearTimeout(missT);missT=setTimeout(function(){m.classList.remove('show');},6500);}
+function routeRatio(w){   // 最短可走路線長度（8 方向、不切角、直走 1、斜走 1.414）÷ 起點到目標的直線距離
+  var goal=idx(w.target.i,w.target.j),cost=new Float32Array(N*N).fill(1e9),q=[idx(2,2)],inq=new Uint8Array(N*N);cost[q[0]]=0;
+  var ok=function(a,b){return !w.solid[b]&&w.depth[b]<=0.9&&Math.abs(w.level[a]-w.level[b])<=w.limUp;};
+  for(var h=0;h<q.length;h++){   // 帶佇列的鬆弛（SPFA）
+    var c=q[h],ci=(c/N)|0,cj=c%N;inq[c]=0;
+    for(var di=-1;di<=1;di++)for(var dj=-1;dj<=1;dj++){
+      if(!di&&!dj)continue;var ni=ci+di,nj=cj+dj;if(ni<0||nj<0||ni>=N||nj>=N)continue;var n=ni*N+nj;if(!ok(c,n))continue;
+      if(di&&dj&&(!ok(c,ci*N+nj)||!ok(c,ni*N+cj)))continue;
+      var nc=cost[c]+(di&&dj?1.414:1);if(nc<cost[n]){cost[n]=nc;if(!inq[n]){inq[n]=1;q.push(n);}}
+    }
+  }
+  var st=Math.hypot(w.target.i-2,w.target.j-2);return cost[goal]<1e8?cost[goal]/st:99;
+}
+function newMission(forceSeed){   // forceSeed：指定種子重開同一張圖（除錯用）
+  var seed0=forceSeed!==undefined?forceSeed:(Math.random()*1e9)|0,tryN=0,scen=SCENARIOS[scenarioNo%SCENARIOS.length];scenarioNo++;   // 這趟的求救描述和地標，輪流用
+  // 大地圖：先確認「主要路線入門車開得過去」。格子 BFS 走得到之後，再讓除錯機器人實際用物理開一次（限 450 模擬秒），
+  // 開不到的圖就換一張（最多 12 次）。這一步只在換任務時跑，不影響遊戲中的流暢度
+  for(;tryN<40;tryN++){
+    W=generate(seed0+tryN*7919);
+    if(!BIG||forceSeed!==undefined)break;
+    if(!reachable(W))continue;
+    if(MT==='hills'){W.routeRatio=routeRatio(W);if(W.routeRatio<HILL_RATIO[0]||W.routeRatio>HILL_RATIO[1])continue;}   // 丘陵：路線 1.5～2.0 倍直線（太直、太繞都換圖）
+    if(DIFFS_GATE&&tryN<(MT==='cliff'?38:24)){   // 目前關掉（見 DIFFS_GATE）
+      W.scenario=scen;var tc=tileCenter(W.target.i,W.target.j);W.targetPos={x:tc[0]+0.4,y:tH(W.target.i,W.target.j),z:tc[1]+0.4};
+      placeCar();quiet=true;var br=runBot('omni',450);quiet=false;
+      if(!br.found){W.botFail=true;if(MT!=='cliff')continue;}
+    }
+    break;
+  }
+  W.reachTries=tryN;W.scenario=scen;$('resSeed').textContent='種子 '+W.seed+'・'+({valley:'河谷',cliff:'懸崖路',hills:'丘陵'}[MT]||MT);mode=null;   // 篩圖機器人會自動選模式，開始前清掉
+  buildWorld();placeCar();radioReset();car.v=0;car.pitch=car.roll=0;toastT=0;
+  car.aboard=false;car.comfort=100;car.safeHist=[];releaseWinch();setScout(false);
+  startMin=clockMin=DAY.starts[game.slot];hitAcc=0;   // 篩圖機器人跑過會讓時鐘前進，這裡重設
+  targetObj.visible=true;
+  $('mission').textContent=MT==='cliff'?'沿著懸崖窄路找到傷者（小心落石、別讓輪子出路緣）':MT==='hills'?'在丘陵之間找出能走的路，找到傷者':'聽無線電，找到發出求救訊號的登山客';$('passRow').hidden=true;$('radioRow').hidden=false;$('radioSub').style.opacity=MOBILE.matches?0:1;showMission();
+  camT.set(car.x,0,car.z);camHd=car.th;camLift=0;rocksReset();car.cpIdx=0;car.fallT=0;car.hist=[];car.flip=false;car.rewindAsk=false;$('rewind').hidden=true;
+}
+// ----- 結算：分數明細（數字都在這裡）-----
+var SCORE={rescue:100,comfortK:0.6,perfect:20,hourPenalty:2,hourPenaltyMax:30,damageK:0.5,winch:5};   // winch：每勾一次扣幾分（沒有上限）
+function finish(){
+  playing=false;rescued++;game.rescued++;updateHouses();
+  var c=Math.round(car.comfort),minutes=Math.max(0,Math.round(clockMin-startMin)),hrs=minutes/60;
+  var lost=Math.max(0,Math.round(trip.startHealth-game.health)),perfect=c>=70;
+  var items=[['救回傷者',SCORE.rescue],['乘客狀況 '+c,Math.round(c*SCORE.comfortK)]];
+  if(perfect)items.push(['完整救回',SCORE.perfect]);
+  items.push(['花了 '+Math.floor(hrs)+' 小時 '+(minutes%60)+' 分',-Math.min(SCORE.hourPenaltyMax,Math.round(hrs*SCORE.hourPenalty))]);
+  items.push([trip.winchN?'用了絞盤 '+trip.winchN+' 次':'沒用絞盤',-(trip.winchN||0)*SCORE.winch]);
+  items.push(['車況損傷 '+lost+'（現在 '+Math.round(game.health)+'）',-Math.round(lost*SCORE.damageK)]);
+  var sum=0;items.forEach(function(it){sum+=it[1];});sum=Math.max(0,sum);game.score+=sum;
+  $('resTitle').textContent=perfect?'完整救回':'受傷救回';
+  $('resText').textContent=perfect?'傷者平安到家，一路上沒怎麼被顛到。':'人安全送到了，但回程顛得不輕。';
+  $('resList').innerHTML=items.map(function(it){return '<li><span>'+it[0]+'</span><b>'+(it[1]>0?'+':'')+it[1]+'</b></li>';}).join('')+'<li class="total"><span>這趟分數</span><b>'+sum+'</b></li><li><span>總分</span><b>'+game.score+'</b></li>';
+  $('resTown').textContent=rescued<=HOUSES.length?'小鎮亮起了第 '+rescued+' 盞燈。':'小鎮的燈都亮了，住進來的人越來越多。';
+  friendRecord(perfect?'完整救回':'受傷救回',sum);
+  $('result').hidden=false;
+}
+// 叫拖車：這趟算失敗（沒救到人）。沒有「救回傷者」「乘客狀況」「完整救回」的加分；時間、絞盤、車況損傷照常算，車被拖回小鎮
+function finishFail(){
+  playing=false;car.aboard=false;releaseWinch();
+  var minutes=Math.max(0,Math.round(clockMin-startMin)),hrs=minutes/60,lost=Math.max(0,Math.round(trip.startHealth-game.health));
+  var items=[['拖車拖回來，人沒救到',0]];
+  items.push(['花了 '+Math.floor(hrs)+' 小時 '+(minutes%60)+' 分',-Math.min(SCORE.hourPenaltyMax,Math.round(hrs*SCORE.hourPenalty))]);
+  items.push([trip.winchN?'用了絞盤 '+trip.winchN+' 次':'沒用絞盤',-(trip.winchN||0)*SCORE.winch]);
+  items.push(['車況損傷 '+lost+'（現在 '+Math.round(game.health)+'）',-Math.round(lost*SCORE.damageK)]);
+  var sum=0;items.forEach(function(it){sum+=it[1];});sum=Math.max(0,sum);game.score+=sum;
+  $('resTitle').textContent='沒救到人';
+  $('resText').textContent='你叫了拖車，車被拖回小鎮，傷者這趟沒有救回來。';
+  $('resList').innerHTML=items.map(function(it){return '<li><span>'+it[0]+'</span><b>'+(it[1]>0?'+':'')+it[1]+'</b></li>';}).join('')+'<li class="total"><span>這趟分數</span><b>'+sum+'</b></li><li><span>總分</span><b>'+game.score+'</b></li>';
+  $('resTown').textContent='這趟沒有救到人，小鎮的燈沒有多亮。';
+  if(FRIEND.on&&!FRIEND.done){FRIEND.retry=W.seed;$('resText').textContent='車被拖回小鎮。休息一晚，明天早上再去一次。';$('nextBtn').textContent='隔天早上再出發';}
+  $('result').hidden=false;
+}
+// ----- 小鎮畫面：一天三個時段，每出一趟（或修車）過一個時段 -----
+function repairCost(){return game.health>=99.5?0:game.health>=50?1:2;}   // 車況 <100 一定可以修：50～99 花 1 個時段、<50 花 2 個時段；100 不用修
+function advanceSlots(n){game.slot+=n;while(game.slot>=3){game.slot-=3;game.day++;}}
+var MT_ORDER=['valley','cliff','hills'],MT_NAME={valley:'河谷',cliff:'懸崖路',hills:'丘陵'};
+var BRIEF={valley:['河谷','河邊的地一段一段不一樣：沙、泥、水。腳下換了，模式也要跟著換。'],
+  cliff:['懸崖路','那條路一邊是山，一邊什麼都沒有。慢慢開，聽到上面有石頭在響，就先停一下。'],
+  hills:['丘陵','山坡看起來都差不多，其實陡的地方會讓車往下滑。不確定的時候，停下來看清楚再走。']};
+var MT_TIP={valley:'沿著河谷找人：會依序碰到沙地、泥地、河，記得切模式。',cliff:'懸崖路：整條都是岩石路（開低速檔），有髮夾彎和 S 彎，路寬會變窄，路外就是崖。掉下去或翻車可以回到 5 秒前。',hills:'丘陵：地面全是草地（模式全關），山比較矮，一路起伏。綠色好走的路很少，多半要從黃色的坡慢慢開過去，側坡太斜會滑、會翻。'};
+var selType='valley';
+function renderType(){
+  document.querySelectorAll('#typeSeg button').forEach(function(b){b.classList.toggle('on',b.getAttribute('data-t')===selType);});
+  $('townType').textContent=MT_TIP[selType];
+}
+document.querySelectorAll('#typeSeg button').forEach(function(b){b.onclick=function(){selType=b.getAttribute('data-t');renderType();};});
+function showTown(){
+  playing=false;clockMin=DAY.starts[game.slot];applyLighting(clockMin);
+  var c=repairCost(),h=Math.round(game.health);
+  $('townTitle').textContent='第 '+game.day+' 天　'+DAY.names[game.slot];
+  selType=MT_ORDER[game.trips%3];renderType();   // 預設選下一個輪到的類型，玩家可以改
+  $('townHealthTxt').textContent=h+' / 100';$('townRescued').textContent=game.rescued+' 人';$('townScore').textContent=game.score;
+  $('townTime').textContent=fmtClock(DAY.starts[game.slot]);
+  var fl=$('townHealth');fl.style.width=h+'%';fl.style.background=h>=75?'var(--ok)':h>=50?'var(--accent)':'var(--bad)';
+  $('townHint').textContent=c===0?'車況很好，可以直接出發。':(game.health>=75?'車況還行，想修的話花 1 個時段就回到 100。':c===1?'車況有點差：修車要花 1 個時段。':'車況很差：修車要花 2 個時段。')+(game.health>=75?'':'不修也能出發，但車會變難開（極速打折、方向盤偏一邊）。');
+  var rb=$('repairBtn');rb.disabled=c===0;rb.textContent=c===0?'車況良好，不用修':'修車（花 '+c+' 個時段，車況回 100）';
+  $('town').hidden=false;
+}
+function startTrip(){
+  $('town').hidden=true;MT=selType;game.trips++;if(FRIEND.on&&FRIEND.retry!==null){newMission(FRIEND.retry);FRIEND.retry=null;}else newMission();trip={winch:false,winchN:0,startHealth:game.health};
+  playing=true;if(!audio)startAudio();
+}
+function repairCar(){var c=repairCost();if(!c)return;game.health=100;advanceSlots(c);showTown();}
+function releaseWinch(){car.winch=false;car.winchA=false;car.winchT=0;car.winchPull=null;anchor=null;rope.visible=false;anchorMark.visible=false;setTog('tWinch',false,'');}
+// 絞盤：按住才收線、放開就停止並解除。河裡卡住、或不是懸崖路而附近有樹／大石頭 → 照舊用錨點；
+// 其他情況（例如卡在路邊斜坡、輪子懸空）→ 拉向「最近 8 秒內最後一個在路面中央、沒懸空的位置」，收線時不會被懸空／掉崖判定打斷，車頭也慢慢轉回路的方向
+var WINCH_PULL={speed:1.2,turn:0.8,memory:8,hold:0.4};
+// 絞盤（所有地圖統一，Lu 2026-10-13）：按住＝收線；按住時 WASD／搖桿指一個方向（以畫面為準），勾那個方向上的樹或大石頭（WINCH_A.range 公尺內、前後左右都可以）。
+// 沒指方向＝勾最近的。收線時車被直接拉向錨點（不用油門），車頭慢慢轉向錨點（錨點在後面就倒著拉）；台階上限照舊多 LS 層，樹和石頭照樣擋
+var WINCH_A={range:30,min:3.4,speed:0.9,turn:1.0,aim:0.3};   // aim：選好方向後停多久才開始收線（秒）
+function anchorCands(){
+  var c=[];function add(x,z,y){var d=Math.hypot(x-car.x,z-car.z);if(d>=WINCH_A.min&&d<=WINCH_A.range)c.push({x:x,z:z,y:y,d:d});}
+  W.trees.forEach(function(t){add(t.x,t.z,t.y);});W.rocks.forEach(function(r){add(r.x,r.z,groundH(r.x,r.z)+0.8);});(W.clAnchors||[]).forEach(function(a){add(a.x,a.z,groundH(a.cx,a.cz)+0.8);});return c;
+}
+var winchDrag=null;   // 手機：按住絞盤鈕往哪拖（畫面方向，右＋、上＋；沒拖＝null）
+var winchAimDbg=null;   // 除錯：直接指定世界方向
+function winchDir(){   // 現在指的方向（世界座標的單位向量；沒指＝null）。畫面上＝鏡頭前方，右＝鏡頭右邊
+  if(winchAimDbg)return winchAimDbg;
+  var ix=0,iy=0;if(winchDrag){ix=winchDrag[0];iy=winchDrag[1];}else if(stick.on){ix=stick.x;iy=stick.y;}else{ix=(keys.right?1:0)-(keys.left?1:0);iy=(keys.gas?1:0)-(keys.brake?1:0);}
+  var l=Math.hypot(ix,iy);if(l<0.3)return null;ix/=l;iy/=l;
+  var fx=Math.sin(camHd),fz=Math.cos(camHd),rx=-Math.cos(camHd),rz=Math.sin(camHd);
+  return [fx*iy+rx*ix,fz*iy+rz*ix];
+}
+function cliffPullOK(x,z,th){   // 懸崖路收線：輪子沒有進到山壁格（比路面高很多的非路格）就可以拉
+  var ws2=wheelWorld(x,z,th);for(var k=0;k<4;k++){var t=tileOf(ws2[k][0],ws2[k][1]);if(t<0)return false;if(!W.roadTile[t]&&W.level[t]>W.L0+W.limUp)return false;if(blocked(ws2[k][0],ws2[k][1],0.35))return false;}
+  return true;
+}
+function pickAnchor(dir){
+  var c=anchorCands(),best=null,bs=1e9;
+  c.forEach(function(a){var sc;
+    if(dir){var cs=((a.x-car.x)*dir[0]+(a.z-car.z)*dir[1])/a.d;if(cs<0.55)return;sc=(1-cs)*3+a.d/WINCH_A.range;}   // 指的方向 ±57° 內，越正、越近越好
+    else sc=a.d;
+    if(sc<bs){bs=sc;best=a;}});
+  return best;
+}
+function winchStart(){
+  if(!playing||car.winch||car.winchPull||car.fallT>0)return;
+  // 按下只進入「選方向」：還沒勾、不扣分；指了方向才挑錨點（黃圈＋繩子），同一個方向停 WINCH_A.aim 秒才開始收線
+  anchor=null;car.winch=true;car.winchA=true;car.winchT=0;setTog('tWinch',true,'');
+  say('往一個方向指，選要勾的樹或石頭',2000);
+}
+function winchStop(){if(car.winch||car.winchPull)releaseWinch();}
+var towArm=0;
+function tow(){   // 按兩下確認（3 秒內再按一次），避免誤觸；確認後這趟算沒救到人
+  if(!playing)return;
+  if(towArm<=0){towArm=3;setTog('tTow',true,'');say('再按一次「拖車」確認（算沒救到人）',2600);return;}
+  towArm=0;setTog('tTow',false,'');finishFail();
+}
+
+// ---------- input ----------
+var stick={on:false,x:0,y:0};   // 虛擬搖桿讀數，x：右為正，y：上為正，範圍 -1～1
+var keys={gas:false,brake:false,left:false,right:false};
+var KM={KeyW:'gas',ArrowUp:'gas',KeyS:'brake',ArrowDown:'brake',KeyA:'left',ArrowLeft:'left',KeyD:'right',ArrowRight:'right'};
+addEventListener('keydown',function(e){
+  if(e.code==='Backquote'){debugMarker=!debugMarker;say(debugMarker?'除錯：顯示求救標記':'除錯：隱藏求救標記');e.preventDefault();return;}
+  if(KM[e.code]){keys[KM[e.code]]=true;e.preventDefault();return;}
+  if(!playing||e.repeat)return;
+  if(e.code==='KeyQ'||e.code==='Digit1')setMode('rock');else if(e.code==='Digit2')setMode('sand');else if(e.code==='KeyE'||e.code==='Digit3')setMode('mud');else if(e.code==='Digit4')setMode('river');else if(e.code==='KeyR')winchStart();
+  else if(e.code==='KeyF')setScout(!scouting);else if(e.code==='KeyT')tow();
+});
+addEventListener('keyup',function(e){if(KM[e.code])keys[KM[e.code]]=false;if(e.code==='KeyR')winchStop();});
+addEventListener('blur',function(){for(var k in keys)keys[k]=false;winchStop();});
+[['tRock','rock'],['tSand','sand'],['tMud','mud'],['tRiver','river']].forEach(function(p){$(p[0]).onclick=function(){if(playing)setMode(p[1]);};});
+(function(){var wb=$('tWinch'),cx=0,cy=0,chip=wb.querySelector('.chip');
+  wb.addEventListener('pointerdown',function(e){e.preventDefault();if(!playing)return;try{wb.setPointerCapture(e.pointerId);}catch(_e){}var r=wb.getBoundingClientRect();cx=r.left+r.width/2;cy=r.top+r.height/2;winchDrag=null;winchStart();});
+  wb.addEventListener('pointermove',function(e){if(!car.winch&&!car.winchPull)return;var dx=e.clientX-cx,dy=e.clientY-cy,l=Math.hypot(dx,dy);   // 按住拖＝選方向（拖超過 12 px 才算）
+    if(l<12){winchDrag=null;if(chip)chip.style.transform='';return;}winchDrag=[dx/l,-dy/l];if(chip)chip.style.transform='translate('+(dx/l*12).toFixed(1)+'px,'+(dy/l*12).toFixed(1)+'px)';});
+  ['pointerup','pointercancel','lostpointercapture'].forEach(function(n){wb.addEventListener(n,function(){winchDrag=null;if(chip)chip.style.transform='';winchStop();});});
+})();
+$('tScout').onclick=function(){setScout(!scouting);};
+$('tTow').onclick=tow;
+document.querySelectorAll('.tpad button').forEach(function(b){
+  var k=b.getAttribute('data-k');
+  b.addEventListener('pointerdown',function(e){keys[k]=true;b.classList.add('held');b.setPointerCapture(e.pointerId);e.preventDefault();});
+  ['pointerup','pointercancel','lostpointercapture'].forEach(function(ev){b.addEventListener(ev,function(){keys[k]=false;b.classList.remove('held');});});
+});
+
+
+$('mission').parentNode.addEventListener('click',function(e){if(!MOBILE.matches||e.target.closest('#menuBtn'))return;var m=$('mission');if(m.classList.contains('show')){m.classList.remove('show');clearTimeout(missT);}else showMission();});
+// ---------- 虛擬搖桿（單手）----------
+(function(){
+  var zone=$('stickZone'),base=$('stick'),knob=$('knob'),R=50,ox=0,oy=0,activeId=null,kind=null;   // kind：'p'＝Pointer Events、't'＝Touch Events（哪一種先到就用哪一種，另一種忽略）
+  function move(x,y){
+    var dx=x-ox,dy=y-oy,m=Math.hypot(dx,dy);
+    if(m>R){dx*=R/m;dy*=R/m;}
+    knob.style.transform='translate('+dx+'px,'+dy+'px)';
+    var nx=dx/R,ny=-dy/R;stick.x=Math.abs(nx)<0.12?0:nx;stick.y=Math.abs(ny)<0.12?0:ny;stick.on=true;
+  }
+  // 浮動搖桿：下半部任何地方按下，搖桿出現在那裡；放開回到中下的淡淡提示圈
+  function start(x,y){
+    ox=clamp(x,72,innerWidth-72);oy=clamp(y,innerHeight*0.56+40,innerHeight-60);
+    base.style.left=(ox-68)+'px';base.style.top=(oy-68)+'px';base.style.right='auto';base.style.bottom='auto';base.style.marginLeft='0';base.classList.add('active');
+    move(x,y);
+  }
+  function end(){activeId=null;kind=null;stick.on=false;stick.x=stick.y=0;knob.style.transform='';
+    base.style.left=base.style.top=base.style.right=base.style.bottom=base.style.marginLeft='';base.classList.remove('active');}
+  // Pointer Events
+  zone.addEventListener('pointerdown',function(e){
+    if(activeId!==null)return;kind='p';activeId=e.pointerId;
+    try{zone.setPointerCapture(e.pointerId);}catch(err){}
+    start(e.clientX,e.clientY);e.preventDefault();
+  },{passive:false});
+  window.addEventListener('pointermove',function(e){if(kind==='p'&&e.pointerId===activeId){move(e.clientX,e.clientY);e.preventDefault();}},{passive:false});
+  ['pointerup','pointercancel'].forEach(function(ev){window.addEventListener(ev,function(e){if(kind==='p'&&e.pointerId===activeId)end();});});
+  // Touch Events 備援（iOS WKWebView 偶爾不送 Pointer Events）
+  zone.addEventListener('touchstart',function(e){
+    e.preventDefault();if(activeId!==null)return;
+    var t=e.changedTouches[0];kind='t';activeId=t.identifier;start(t.clientX,t.clientY);
+  },{passive:false});
+  window.addEventListener('touchmove',function(e){
+    if(kind!=='t')return;
+    for(var i=0;i<e.changedTouches.length;i++)if(e.changedTouches[i].identifier===activeId){move(e.changedTouches[i].clientX,e.changedTouches[i].clientY);}
+    e.preventDefault();
+  },{passive:false});
+  ['touchend','touchcancel'].forEach(function(ev){window.addEventListener(ev,function(e){
+    if(kind!=='t')return;
+    for(var i=0;i<e.changedTouches.length;i++)if(e.changedTouches[i].identifier===activeId){end();return;}
+  },{passive:false});});
+  // iOS 的雙指縮放整頁手勢不要搶走遊戲
+  ['gesturestart','gesturechange'].forEach(function(ev){document.addEventListener(ev,function(e){e.preventDefault();},{passive:false});});
+  // 不常用的功能鍵（絞盤、轉視角、拖車）收進「⋯」選單，常用的四顆留在搖桿上方，同一隻手按得到
+})();
+// ---------- 手機版面：車庫抽屜、難度選單 ----------
+$('menuBtn').onclick=function(){$('menuWrap').classList.toggle('open');};
+$('vol').oninput=function(){radioVol=this.value/100;$('volTxt').textContent=this.value+'%';if(audio&&audio.rg)audio.rg.gain.value=radioVol;};
+['easy','normal','hard'].forEach(function(n){$('diff_'+n).addEventListener('click',function(){$('menuWrap').classList.remove('open');});});
+// ---------- audio ----------
+var audio=null,radioVol=0.6;   // 無線電音量 0～1，預設 60%
+function startAudio(){
+  try{var A=new (window.AudioContext||window.webkitAudioContext)();var o=A.createOscillator(),o2=A.createOscillator(),f=A.createBiquadFilter(),g=A.createGain();
+    o.type='sawtooth';o2.type='square';o.frequency.value=42;o2.frequency.value=21;f.type='lowpass';f.frequency.value=260;g.gain.value=0;   // 從怠速的低音開始、音量 0（原本是預設 440 Hz，在選單畫面就一直「嘟——」）；出發後才淡入
+    o.connect(f);o2.connect(f);f.connect(g);g.connect(A.destination);o.start();o2.start();audio={A:A,o:o,o2:o2,f:f,g:g};
+    // 無線電雜訊：白噪音 → 帶通濾波 → 音量（訊號越弱越大聲）
+    var len=A.sampleRate*2,buf=A.createBuffer(1,len,A.sampleRate),d=buf.getChannelData(0);
+    for(var i=0;i<len;i++)d[i]=Math.random()*2-1;
+    var ns=A.createBufferSource();ns.buffer=buf;ns.loop=true;
+    var nf=A.createBiquadFilter(),ng=A.createGain();nf.type='bandpass';nf.frequency.value=1800;nf.Q.value=0.5;ng.gain.value=RADIO.noiseMax;
+    var rg=A.createGain();rg.gain.value=radioVol;rg.connect(A.destination);   // 無線電總音量（滑桿）；上車後整個關掉
+    ng.gain.value=0;ns.connect(nf);nf.connect(ng);ng.connect(rg);ns.start();
+    audio.nf=nf;audio.ng=ng;audio.rg=rg;audio.nbuf=buf;}catch(e){audio=null;}
+}
+
+['easy','normal','hard'].forEach(function(n){$('diff_'+n).onclick=function(){this.blur();if(n===diffName)return;setDifficulty(n);newMission();say('難度：'+DIFFS[n].label+'（重新出任務）',2000);};});
+$('goBtn').onclick=function(){$('intro').hidden=true;if(!audio)startAudio();if(FRIEND.on)showBrief(MT_ORDER[0]);else showTown();};
+$('departBtn').onclick=function(){var b=BRIEF[selType];$('briefTitle').textContent=b[0];$('briefText').textContent='「'+b[1]+'」';$('town').hidden=true;$('brief').hidden=false;};   // 先看這關的提醒
+$('briefGo').onclick=function(){$('brief').hidden=true;startTrip();};
+$('repairBtn').onclick=repairCar;
+$('nextBtn').onclick=function(){$('result').hidden=true;
+  if(FRIEND.on&&FRIEND.retry!==null){game.day++;game.slot=0;game.health=100;showBrief(MT_ORDER[FRIEND.runs.length]);return;}   // 朋友版拖車：隔天早上再開同一關（同一張圖）
+  advanceSlots(1);
+  if(FRIEND.on&&FRIEND.runs.length<3){game.health=100;showBrief(MT_ORDER[FRIEND.runs.length]);}   // 朋友版：直接下一關（每關車況回滿）
+  else if(FRIEND.on&&!FRIEND.done){FRIEND.done=true;showFinal();}
+  else showTown();};
+// ----- 朋友版：按順序玩三關（河谷 → 懸崖路 → 丘陵），玩完給總成績、分享、繼續或重新開始 -----
+var FRIEND={on:true,runs:[],done:false,retry:null};
+function showBrief(t){selType=t;var b=BRIEF[t],fr=FRIEND.on&&!FRIEND.done;$('briefTitle').textContent=(fr?'第 '+(FRIEND.runs.length+1)+' 關・':'')+b[0];$('briefText').textContent='「'+b[1]+(fr&&t==='cliff'?'絞盤也許可以幫上你的忙。':'')+'」';$('town').hidden=true;$('brief').hidden=false;}
+function friendRecord(title,sum){if(!FRIEND.on||FRIEND.done)return;FRIEND.runs.push({t:MT,title:title,sum:sum});FRIEND.days=game.day;
+  $('nextBtn').textContent=FRIEND.runs.length<3?'下一關':'看總成績';}
+function showFinal(){
+  var tot=0,lines=FRIEND.runs.map(function(r,i){tot+=r.sum;return '第 '+(i+1)+' 關 '+MT_NAME[r.t]+'　'+r.title+'　'+r.sum+' 分';});
+  $('finalSub').textContent='花了 '+FRIEND.days+' 天拯救了小鎮';
+  $('finalList').innerHTML=FRIEND.runs.map(function(r,i){return '<li><span>第 '+(i+1)+' 關・'+MT_NAME[r.t]+'　'+r.title+'</span><b>'+r.sum+'</b></li>';}).join('')+'<li class="total"><span>總分</span><b>'+tot+'</b></li>';
+  FRIEND.text='救援行動｜花了 '+FRIEND.days+' 天拯救了小鎮，總分 '+tot+'\n'+lines.join('\n');
+  $('shareTxt').textContent=FRIEND.text;$('nextBtn').textContent='回小鎮';
+  $('final').hidden=false;
+}
+$('shareBtn').onclick=function(){var t=FRIEND.text;
+  function copied(ok){say(ok?'成績已複製，可以貼給朋友':'沒辦法自動複製：長按上面的文字複製，或直接截圖',2600);}
+  function copy(){if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(function(){copied(true);},function(){copied(false);});else copied(false);}
+  if(navigator.share)navigator.share({title:'救援行動',text:t}).catch(function(e){if(!e||e.name!=='AbortError')copy();});else copy();};
+$('contBtn').onclick=function(){$('final').hidden=true;showTown();};
+$('restartBtn').onclick=function(){$('final').hidden=true;
+  game.day=1;game.slot=0;game.health=100;game.rescued=0;game.score=0;game.trips=0;rescued=0;updateHouses();
+  FRIEND.runs=[];FRIEND.done=false;FRIEND.retry=null;$('nextBtn').textContent='下一關';showBrief(MT_ORDER[0]);};
+
+// ---------- physics ----------
+var blockMsgT=0,spinT=0,modeHintT=0,tiltHintT=0,tipT2=0,safeT=0,histT=0,rollWarnT=0;
+// 點 (x,z)（半徑 pr）有沒有碰到房子或樹、岩石、倒木的實際形狀
+function blocked(x,z,pr){
+  var t=tileOf(x,z);if(t<0)return false;
+  if(W.hard[t])return true;
+  var L=W.obst[t];if(!L)return false;
+  for(var n=0;n<L.length;n++){
+    var o=L[n],dx=x-o.x,dz=z-o.z,rr=o.r+pr;
+    if(o.seg){var sx=o.x2-o.x,sz=o.z2-o.z,u=clamp((dx*sx+dz*sz)/(sx*sx+sz*sz),0,1);dx-=sx*u;dz-=sz*u;}
+    if(dx*dx+dz*dz<rr*rr)return true;
+  }
+  return false;
+}
+function check(nx,nz,nth,limit,st){
+  var nw=wheelWorld(nx,nz,nth),ow=wheelWorld(car.x,car.z,car.th),drop=0;
+  for(var k=0;k<4;k++){
+    var nt=tileOf(nw[k][0],nw[k][1]);if(nt<0)return{ok:false,why:'edge'};
+    if(blocked(nw[k][0],nw[k][1],0.35))return{ok:false,why:'solid'};
+    if(W.depth[nt]>st.wade)return{ok:false,why:'deep'};
+    var ot=tileOf(ow[k][0],ow[k][1]);if(ot<0)continue;
+    var rise=W.level[nt]-W.level[ot];
+    if(rise>limit)return{ok:false,why:'step',rise:rise};
+    if(BIG&&-rise>W.limDown)return{ok:false,why:'ledge'};   // 大地圖：往下落差 ≤ 0.9 公尺放行（不會摔車），更高的才擋
+    if(-rise>drop)drop=-rise;
+  }
+  var pts=[[0,1.75],[0,-1.75],[0.8,1.6],[-0.8,1.6],[0.9,0],[-0.9,0]];
+  for(k=0;k<pts.length;k++){var p=localToWorld(nx,nz,nth,pts[k][0],pts[k][1]),t=tileOf(p[0],p[1]);if(t<0)return{ok:false,why:'edge'};if(blocked(p[0],p[1],0.25))return{ok:false,why:'solid'};}
+  return{ok:true,drop:drop};
+}
+
+// ---------- 懸崖路：掉落與檢查點、落石；側坡翻車 ----------
+// 兩輪以上出了路緣（到了懸崖側的格子）就掉下去，約 2 秒後回檢查點；單輪懸空只是車速被壓住
+var REWIND_SEC=5,FALL_SHOW=1.2,FLIP_ROLL=1.35;   // 翻車／掉崖：動畫約 FALL_SHOW 秒後跳出「回到 REWIND_SEC 秒前」；車身側傾超過 FLIP_ROLL 弧度（約 77°）持續 0.4 秒才算整台翻過來
+function startFall(){
+  if(car.fallT>0)return;
+  car.fallT=0.001;car.v=0;car.bodyVy=0;car.flip=false;car.rewindAsk=false;
+  var ct=tileOf(car.x,car.z);car.fnx=W.cnx&&car.lastN?car.lastN[0]:0;car.fnz=car.lastN?car.lastN[1]:0;
+  if(!quiet){say('掉下去了⋯',1800);damage(15,'fall');hurt(25,stats(),'好可怕⋯');game.falls=(game.falls||0)+1;}
+}
+function startFlip(nr){   // 整台翻過來（車頂朝下／側翻倒地）：原地翻過去
+  if(car.fallT>0)return;
+  car.fallT=0.001;car.v=0;car.bodyVy=0;car.flip=true;car.flipDir=nr<0?-1:1;car.rewindAsk=false;
+  if(!quiet){say('翻車了⋯',1800);damage(10,'roll');hurt(20,stats(),'翻車了⋯');}
+}
+function askRewind(why){car.rewindAsk=true;$('rewindTxt').textContent=why;$('rewindBtn').textContent='回到 '+REWIND_SEC+' 秒前';$('rewind').hidden=false;}
+function doRewind(){   // 回到 REWIND_SEC 秒前的位置（歷史每 0.25 秒記一筆）；沒有那麼久的紀錄就回檢查點
+  if(!car.rewindAsk)return;
+  var hs=car.hist||[],h=hs[Math.max(0,hs.length-1-REWIND_SEC*4)];
+  if(h){car.x=h.x;car.z=h.z;car.th=h.th;}
+  else{var cp=W.cps[Math.min(car.cpIdx||0,W.cps.length-1)];car.x=cp.x;car.z=cp.z;car.th=cp.th+(car.aboard?Math.PI:0);}
+  car.v=0;car.fallT=0;car.flip=false;car.rewindAsk=false;car.roll=car.pitch=0;car.bodyVy=0;car.bodyY=groundH(car.x,car.z)+0.74;camHd=car.th;car.hist=[];
+  $('rewind').hidden=true;
+}
+function fallPhysics(dt,st){
+  if(car.rewindAsk){var wsF=wheelWorld(car.x,car.z,car.th);return {st:st,ws:wsF,hs:wsF.map(function(w){return groundH(w[0],w[1]);})};}   // 等玩家按按鈕：畫面停住
+  car.fallT+=dt;var t=car.fallT;
+  if(car.flip){car.roll=(car.flipDir||1)*Math.PI*ss(0,1.0,t);car.bodyY=groundH(car.x,car.z)+0.74+0.5*Math.sin(Math.min(1,t)*Math.PI);}
+  else{car.bodyVy-=14*dt*Math.min(1,t*1.6);car.bodyY+=car.bodyVy*dt;car.roll+=dt*1.7;car.pitch+=dt*0.9;
+    car.x+=car.fnx*1.5*dt;car.z+=car.fnz*1.5*dt;}
+  if(quiet){   // 機器人：照舊自動回檢查點
+    if(t>1.9){
+      var cp=W.cps[Math.min(car.cpIdx||0,W.cps.length-1)];
+      car.x=cp.x;car.z=cp.z;car.th=cp.th+(car.aboard?Math.PI:0);car.v=0;car.fallT=0;car.flip=false;car.roll=car.pitch=0;car.bodyVy=0;
+      car.bodyY=groundH(car.x,car.z)+0.74;camHd=car.th;
+    }
+  }else if(t>FALL_SHOW)askRewind(car.flip?'整台車翻過來了':'車子掉下山了');
+  var ws0=wheelWorld(car.x,car.z,car.th),hs0=ws0.map(function(w){return groundH(w[0],w[1]);});
+  return {st:st,ws:ws0,hs:hs0};
+}
+// 丘陵側坡參數（要調手感改這裡）：25～40° 警告＋側滑（slideMin→slideMax m/s），>40° 持續 flipSec 秒才翻車
+var HILL_ROLL={warnDeg:25,flipDeg:40,slideMin:0.5,slideMax:1.0,flipSec:1.5,hurtRate:0.3};
+function rollover(){   // 側坡太斜翻車：回到 3 秒前
+  var hs=car.hist||[],h=hs[Math.max(0,hs.length-13)];
+  if(!h||quiet)return;
+  car.x=h.x;car.z=h.z;car.th=h.th;car.v=0;car.roll=car.pitch=0;car.bodyVy=0;car.bodyY=groundH(car.x,car.z)+0.74;camHd=car.th;car.hist=[];
+  damage(10,'roll');hurt(20,stats(),'翻車了⋯');say('翻車了⋯回到 3 秒前',1800);
+}
+// 落石：山壁那側偶爾掉石頭。先有小碎石和塵土（約 1.5 秒），石頭才落下，落下後留在路上成為障礙
+var rockT=5,rockWarn=[],rockFall=[],rockDyn=[];
+function rocksReset(){rockT=5;rockWarn=[];rockFall=[];rockDyn=[];}
+// 落點規則：只落在山壁側（貼著山壁腳，離中心線往山壁 2.8～3.6 m）；落地後該段路從石頭外緣到懸崖側路緣至少要留「車寬＋1 m」
+// （把已在路上、正在落下、預警中的石頭一起算）；同一段路上兩顆石頭中心至少隔 6 m，不然就換落點或這次不掉
+var ROCK_HALF=4.4,ROCK_FREE=2.8,ROCK_GAP=6,ROCK_RETURN_K=0.5,ROCK_MIN_RR=6.0,rockSpawnN=0;   // 回程間隔乘 ROCK_RETURN_K（0.5＝次數兩倍）；可走半徑 < ROCK_MIN_RR（1～2 級窄段）不落石
+function rockList(){var l=[];rockDyn.forEach(function(d){if(d.o.r>0)l.push({x:d.o.x,z:d.o.z,r:d.o.r});});rockFall.forEach(function(f){l.push({x:f.x,z:f.z,r:1.4*f.s});});rockWarn.forEach(function(w){l.push({x:w.x,z:w.z,r:1.4*w.s});});return l;}
+function spawnRockWarn(){
+  if(!W.roadPts||!W.roadPts.length)return false;
+  var best=0,bd=1e9;for(var n=0;n<W.roadPts.length;n++){var p=W.roadPts[n],d=Math.hypot(p.x-car.x,p.z-car.z);if(d<bd){bd=d;best=n;}}
+  var dir=car.aboard?-1:1,others=rockList();
+  for(var tr=0;tr<8;tr++){
+    var ip=clamp(best+dir*Math.round(6+Math.random()*10),0,W.roadPts.length-1),pt=W.roadPts[ip],s=0.55+Math.random()*0.3,cr=1.4*s;
+    if((pt.rr||ROCK_HALF)<ROCK_MIN_RR)continue;   // 窄段不落
+    var lat=-((pt.rr||ROCK_HALF)-1.6-Math.random()*0.8),x=pt.x-pt.nx*(-lat),z=pt.z-pt.nz*(-lat);   // lat<0＝山壁側（貼著山壁腳）
+    var maxEdge=lat+cr,ok=true;
+    for(var q=0;q<others.length;q++){
+      var o=others[q],dd=Math.hypot(o.x-x,o.z-z);
+      if(dd<ROCK_GAP){ok=false;break;}
+      if(dd<10){var lo=(o.x-pt.x)*pt.nx+(o.z-pt.z)*pt.nz;maxEdge=Math.max(maxEdge,lo+o.r);}   // 附近的石頭一起算，看懸崖側還剩多寬
+    }
+    if(!ok||(pt.rr||ROCK_HALF)-maxEdge<ROCK_FREE)continue;
+    rockWarn.push({x:x,z:z,wx:-pt.nx,wz:-pt.nz,t:1.5,s:s});rockSpawnN++;return true;
+  }
+  return false;
+}
+var rockG2=new THREE.IcosahedronGeometry(1,0),rockM2=new THREE.MeshLambertMaterial({color:0x8a8178,flatShading:true});
+function updateRockfall(dt){
+  if(MT!=='cliff'||!playing||!W.roadPts||!W.roadPts.length)return;
+  rockT-=dt;if(rockT<=0){rockT=(spawnRockWarn()?5+Math.random()*5:2)*(car.aboard?ROCK_RETURN_K:1);}
+  for(var n=rockWarn.length-1;n>=0;n--){
+    var w=rockWarn[n];w.t-=dt;
+    if(Math.random()<0.7){var gy=groundH(w.x,w.z);   // 山壁那邊先掉小碎石、揚塵
+      emit(parts,pi++,w.x+w.wx*(2+Math.random()*2.5),gy+3+Math.random()*4,w.z+w.wz*(2+Math.random()*2.5),0x9a8f84,w.wx*-0.6,-1,w.wz*-0.6,0.9);
+      emit(smoke,si++,w.x+w.wx*3,gy+0.6,w.z+w.wz*3,0xcfc3b4,0,0.5,0,1.2,2.2);}
+    if(w.t<=0){rockWarn.splice(n,1);var mesh=new THREE.Mesh(rockG2,rockM2);mesh.scale.set(1.5*w.s,1.0*w.s,1.2*w.s);mesh.castShadow=true;mesh.position.set(w.x,groundH(w.x,w.z)+18,w.z);worldGroup.add(mesh);
+      rockFall.push({m:mesh,x:w.x,z:w.z,s:w.s,vy:0});}
+  }
+  for(var q=rockFall.length-1;q>=0;q--){
+    var r=rockFall[q];r.vy-=18*dt;r.m.position.y+=r.vy*dt;r.m.rotation.x+=dt*3;
+    var gy2=groundH(r.x,r.z)+0.45*r.s;
+    if(r.m.position.y<=gy2){
+      r.m.position.y=gy2;rockFall.splice(q,1);
+      var o={x:r.x,z:r.z,r:1.4*r.s};   // 落下的石頭成為障礙（圓形碰撞），也能當絞盤錨點
+      var tc=tileOf(r.x,r.z);if(tc>=0)for(var di=-1;di<=1;di++)for(var dj=-1;dj<=1;dj++){var ni=((tc/N)|0)+di,nj=(tc%N)+dj;if(ni>=0&&nj>=0&&ni<N&&nj<N){var tt=ni*N+nj;(W.obst[tt]||(W.obst[tt]=[])).push(o);}}
+      W.rocks.push({x:r.x,z:r.z,s:r.s,cr:o.r});rockDyn.push({m:r.m,o:o});
+      for(var pp=0;pp<8;pp++)emit(smoke,si++,r.x+(Math.random()-0.5)*2,gy2+0.3,r.z+(Math.random()-0.5)*2,0xcfc3b4,(Math.random()-0.5)*1.5,0.8,(Math.random()-0.5)*1.5,1.2,2.5);
+      if(Math.hypot(car.x-r.x,car.z-r.z)<2.4&&!quiet){damage(10,'rock');hurt(15,stats(),'被石頭砸到⋯');car.v*=0.3;say('被落石砸到！',1600);}
+    }
+  }
+  if(rockDyn.length>14){var old=rockDyn.shift();worldGroup.remove(old.m);old.o.r=0;}   // 太多就把最舊的拿掉
+}
+
+// ----- 車況（0～100，跨趟累積）與乘客狀況 -----
+var game={day:1,slot:0,health:100,rescued:0,score:0,trips:0},trip={winch:false,winchN:0,startHealth:100};
+var HBIAS=Math.random()<0.5?-1:1;   // 車況差時，方向盤偏向哪一邊
+var hitAcc=0,lastCause='好晃⋯',tipT=0,landCd=0,landMax=0,hitCd=0;
+// 落地／撞擊／選錯模式的扣分參數（三種任務共用，要調手感改這裡）
+var HIT={landFree:0.25,landCool:1.5,landDmgMax:3,landHurtMax:5,hitDmgMax:4,hitHurtMax:6,hitCool:1,wrongHurtHard:1.5,wrongHurt:0.8,wrongDmg:0.2};
+var dmgLog={};   // 除錯：各種原因扣了多少車況
+function damage(n,tag){if(quiet)return;game.health=Math.max(0,game.health-n);if(tag)dmgLog[tag]=(dmgLog[tag]||0)+n;}
+var PASS_K=0.5;   // 乘客狀況的扣分一律乘這個數（三種任務共用；1＝原本的扣法）
+var hurtLog={};   // 除錯：各來源的原始扣分、實際扣分
+var TILT_HURT={free:0.35,k:2};   // 側傾扣乘客：超過 free 弧度（約 20°）才扣，每秒扣（超過的弧度 × k）（Lu：原本 0.2／6 在懸崖路斜坡上扣太快）
+function hurt(n,st,cause){if(car.aboard&&!quiet){var real=n*st.comfortMult*PASS_K;car.comfort=Math.max(0,car.comfort-real);hitAcc+=n*PASS_K;if(cause){lastCause=cause;var hl=hurtLog[cause]||(hurtLog[cause]={raw:0,real:0});hl.raw+=n*st.comfortMult;hl.real+=real;}}}
+
+function physics(dt){
+  var st=stats();
+  clockMin+=dt*DAY.minPerSec*(scouting?DAY.scoutMult:1);   // 勘查時遊戲時間走快一點
+  if(car.fallT>0)return fallPhysics(dt,st);
+  var throttle=0,braking=false,steer=(keys.left?1:0)-(keys.right?1:0);
+  if(keys.gas){if(car.v<-0.4)braking=true;else throttle=1;}
+  if(keys.brake){if(car.v>0.4)braking=true;else throttle=-0.7;}
+  if(car.winchA){throttle=0;braking=false;steer=0;}   // 絞盤收線中：方向鍵／搖桿拿來選錨點，不開車
+  if(stick.on&&!car.winchA){   // 虛擬搖桿：左右＝轉向（類比）；上＝油門（推多遠＝油門多大）；下＝倒車（正在前進就先煞車）
+    steer=-stick.x;
+    if(stick.y>0){if(car.v<-0.4)braking=true;else throttle=stick.y;}
+    else if(stick.y<0){if(car.v>0.4)braking=true;else throttle=-0.7*(-stick.y);}
+  }
+  var ws=wheelWorld(car.x,car.z,car.th),hs=ws.map(function(w){return groundH(w[0],w[1]);});
+  var pitch=Math.atan2((hs[0]+hs[1])/2-(hs[2]+hs[3])/2,2.2);
+  // 地形與模式：要的模式選對才正常，選錯極速剩 SLOW（不會停）；河裡沒選「升高」就卡住（只能用絞盤）
+  var req=curReq(),matched=(mode===req),inWater=req==='river';
+  car.stalled=inWater&&mode!=='river';
+  var T=0.9*9.8*Math.cos(pitch),drag=0.3;
+  var grav=9.8*Math.sin(pitch);
+  var tiltK=1;
+  if(W.tilt){var tt0=tileOf(car.x,car.z);if(tt0>=0&&W.roadTile[tt0]){var tv=W.tilt[tt0];car.lastN=[W.cnx[tt0],W.cnz[tt0]];
+    if(tv>0.07){tiltK=clamp(1-(tv-0.07)*6,0.35,1);if(tiltK<0.85&&tiltHintT<=0&&!quiet){tiltHintT=5;say('路往懸崖斜，慢一點！',1400);}}}}
+  tiltHintT-=dt;
+  var power=7.5,top=9*(matched?1:SLOW)*clamp(0.5+0.5*game.health/75,0.5,1)*tiltK;   // 車況 ≥75 不打折，0 時極速剩一半
+  if(!matched&&!car.stalled&&Math.abs(car.v)>0.8&&modeHintT<=0){
+    modeHintT=4;say(req===null?'這裡是草地或路面：模式請全部關掉':'這種地形請選「'+MODE_NAME[req]+'」');
+  }
+  if(car.stalled){throttle=0;drag=14;if(modeHintT<=0){modeHintT=4;say('開進河裡卡住了：按「絞盤」拉出來（下次先選「升高」）');}}
+  modeHintT-=dt;
+  var eng=throttle*power;
+  if(throttle>0)eng*=clamp((top-car.v)/1.5,0,1);else if(throttle<0)eng*=clamp((top*0.5+car.v)/1.5,0,1);
+  var spinning=false;
+  var winchF=0;
+  if(car.winch&&anchor&&!car.winchA){var dx=anchor.x-car.x,dz=anchor.z-car.z,d=Math.hypot(dx,dz);   // 懸崖路：沿車頭方向拉（舊的）
+    if(d<3.2||d>17){releaseWinch();say(d<3.2?'拉到了，絞盤收線':'繩子不夠長，鬆開了');}
+    else winchF=8.5*(dx*Math.sin(car.th)+dz*Math.cos(car.th))/d;}
+  if(car.winchA){   // 選錨點：有指方向就挑那個方向的錨點；換了錨點，收線計時重來（換錨點不另外算次數，按下到放開只算一次）
+    var wdir=winchDir();
+    if(wdir){var na=pickAnchor(wdir);
+      if(na){if(!anchor){trip.winch=true;trip.winchN++;}
+        if(!anchor||Math.abs(na.x-anchor.x)>0.01||Math.abs(na.z-anchor.z)>0.01){anchor=na;car.winchT=0;rope.visible=true;anchorMark.visible=true;}}
+      else if(!anchor&&blockMsgT<=0){blockMsgT=1.5;say('那個方向 '+WINCH_A.range+' 公尺內沒有樹或石頭');}}
+    if(anchor)car.winchT+=dt;
+  }
+  if(car.winchA&&anchor&&car.winchT>=WINCH_A.aim){   // 直接把車拉向錨點（所有地圖）
+    var ax=anchor.x-car.x,az=anchor.z-car.z,ad=Math.hypot(ax,az);
+    if(ad<3.2){releaseWinch();say('拉到了，絞盤收線');}
+    else{
+      var ath=Math.atan2(ax,az),adt=ath-car.th;while(adt>Math.PI)adt-=2*Math.PI;while(adt<-Math.PI)adt+=2*Math.PI;
+      if(Math.abs(adt)>Math.PI/2){adt+=adt>0?-Math.PI:Math.PI;}   // 錨點在後面：倒著拉
+      var wth=car.th+clamp(adt,-WINCH_A.turn*dt,WINCH_A.turn*dt),wnx=car.x+ax/ad*WINCH_A.speed*dt,wnz=car.z+az/ad*WINCH_A.speed*dt;
+      var wr=check(wnx,wnz,wth,W.limUp+LS,st);
+      if(!wr.ok&&W.roadTile&&wr.why==='step'&&cliffPullOK(wnx,wnz,wth))wr={ok:true};
+      if(wr.ok||(wr.why==='solid'&&!check(car.x,car.z,car.th,W.limUp+LS,st).ok)){car.x=wnx;car.z=wnz;car.th=wth;}   // 已經卡在樹／石頭裡：放行，讓它拉出來
+      else if(check(wnx,wnz,car.th,W.limUp+LS,st).ok){car.x=wnx;car.z=wnz;}   // 邊拉邊轉會擦到樹石／坎：先不轉頭，直接拉
+      else{var wr2=check(car.x,car.z,wth,W.limUp+LS,st);if(wr2.ok)car.th=wth;if(blockMsgT<=0){blockMsgT=1.5;say(wr.why==='step'?'坎太高，拉不上去：換個方向':'被擋住了：換個方向');}}
+      car.v=0;
+    }
+  }
+  if(car.winchPull){   // 拉向安全位置：直接把車往那個點移，蓋過懸空、側滑；車頭慢慢轉回路的方向
+    var wp=car.winchPull,wdx=wp.x-car.x,wdz=wp.z-car.z,wd=Math.hypot(wdx,wdz);
+    if(wd<WINCH_PULL.hold){releaseWinch();say('回到路面了');}
+    else{
+      car.x+=wdx/wd*WINCH_PULL.speed*dt;car.z+=wdz/wd*WINCH_PULL.speed*dt;car.v=0;throttle=0;
+      var dth=wp.th-car.th;while(dth>Math.PI)dth-=2*Math.PI;while(dth<-Math.PI)dth+=2*Math.PI;car.th+=clamp(dth,-WINCH_PULL.turn*dt,WINCH_PULL.turn*dt);
+    }
+  }
+  var acc=eng+winchF-grav-drag*car.v-0.2*car.v;
+  if(!throttle&&!winchF&&Math.abs(car.v)<0.25&&Math.abs(grav)<T*1.05+0.3){car.v=0;acc=0;}
+  if(car.stalled&&!winchF&&Math.abs(car.v)<0.3){car.v=0;acc=0;}
+  car.v+=acc*dt;
+  if(car.winchPull||car.winchA)car.v=0;
+  if(braking){var b=11*dt;car.v=Math.abs(car.v)<=b?0:car.v-Math.sign(car.v)*b;}
+  if(game.health<60)steer+=HBIAS*(60-game.health)/60*0.3;   // 車況差：方向盤偏一邊
+  var turn=steer*1.5*Math.min(1,Math.abs(car.v)/2.2)*(car.v<0?-1:1);
+  var nth=car.th+turn*dt,nx=car.x+Math.sin(nth)*car.v*dt,nz=car.z+Math.cos(nth)*car.v*dt;
+  var limit=W.limUp+(car.winch?LS:0);
+  if(car.winchA){nx=car.x;nz=car.z;nth=car.th;}   // 拉向錨點時位置已經在上面處理過
+  var r=check(nx,nz,nth,limit,st);
+  if(!r.ok&&r.why==='solid'&&!check(car.x,car.z,car.th,limit,st).ok)r={ok:true,drop:0};   // 已經卡在樹／石頭裡：放行，讓它開出來
+  if(r.ok){
+    car.x=nx;car.z=nz;car.th=nth;
+  }else{
+    var r2=check(car.x,car.z,nth,limit,st);if(r2.ok)car.th=nth;
+    var sx2=car.x+Math.sin(car.th)*car.v*dt,sz2=car.z+Math.cos(car.th)*car.v*dt;
+    if(!r2.ok&&nth!==car.th&&check(sx2,sz2,car.th,limit,st).ok){car.x=sx2;car.z=sz2;r={ok:true,drop:0};}   // 方向盤一打就擦到：先照原方向直走，不要整台卡死
+  }
+  if(!r.ok){
+    var imp=Math.abs(car.v);
+    if(imp>1.4&&hitCd<=0){hitCd=HIT.hitCool;var idm=Math.min(HIT.hitDmgMax,imp*0.55);hurt(Math.min(HIT.hitHurtMax,idm*1.5),st,'撞到了⋯好痛');damage(idm,'hit');car.bodyVy+=0.8;}
+    car.v*=-0.2;
+    if(blockMsgT<=0&&(keys.gas||keys.brake)){
+      blockMsgT=1.2;
+      if(r.why==='step')say('台階太高：要爬 '+Math.round(r.rise*STEP*100)+' 公分，這台車只能爬 '+Math.round(limit*STEP*100));
+      else if(r.why==='deep')say('水太深，會淹進引擎');
+      else if(r.why==='ledge')say('前面是斷崖，下不去');
+      else if(r.why==='solid')say('撞到了');
+      else say('前面是懸崖邊');
+    }
+  }
+  // spin feedback
+  blockMsgT-=dt;
+  // 懸崖路：輪子到了懸崖側的格子 → 單輪懸空（車速壓住）、兩輪以上掉下去；順便記檢查點
+  if(W.cliffMask){
+    var wsC=wheelWorld(car.x,car.z,car.th),offC=0;
+    for(var kc=0;kc<4;kc++){var tc2=tileOf(wsC[kc][0],wsC[kc][1]);if(tc2>=0&&W.cliffMask[tc2])offC++;}
+    var tcN=tileOf(car.x,car.z),centerOff=tcN>=0&&W.cliffMask[tcN];
+    if(!quiet){   // 記錄「在路面中央、沒懸空」的位置（約 0.25 秒一筆，留 WINCH_PULL.memory 秒），絞盤拉回用
+      safeT-=dt;
+      if(safeT<=0){safeT=0.25;
+        if(offC===0&&!car.winchPull&&!car.winchA){var okS=false,pts5=W.roadPts||[];
+          for(var n5=0;n5<pts5.length;n5+=2){var p5=pts5[n5];if(Math.hypot(p5.x-car.x,p5.z-car.z)<=Math.max(1.2,(p5.rr||3)*0.6)){okS=true;break;}}
+          if(okS){var sh5=car.safeHist||(car.safeHist=[]);sh5.push({x:car.x,z:car.z,th:car.th,t:simT});while(sh5.length&&simT-sh5[0].t>WINCH_PULL.memory)sh5.shift();}
+        }
+      }
+    }
+    if(car.winchPull||car.winchA){}   // 收線中：不判懸空、不掉崖
+    else if((offC>=2&&centerOff)||offC>=3)startFall();
+    else if(offC>=1){if(car.v>2.5)car.v=2.5;if(car.v<-2.5)car.v=-2.5;if(tipT2<=0&&!quiet){tipT2=3;say('輪子懸空！往山壁那邊打',1400);}}
+    tipT2-=dt;
+    for(var ic=0;ic<W.cps.length;ic++){if(Math.hypot(car.x-W.cps[ic].x,car.z-W.cps[ic].z)<10&&ic!==car.cpIdx){car.cpIdx=ic;if(!quiet&&ic>0)say('檢查點',900);}}
+  }
+  // suspension + comfort
+  ws=wheelWorld(car.x,car.z,car.th);hs=ws.map(function(w){return groundH(w[0],w[1]);});
+  var avg=(hs[0]+hs[1]+hs[2]+hs[3])/4,targetY=avg+st.r+st.lift+0.32;
+  var a=st.K*(targetY-car.bodyY)-st.C*car.bodyVy;
+  car.bodyVy+=a*dt;car.bodyY+=car.bodyVy*dt;
+  // 落地：車身「懸空」的高度（車身比該有的高度高出多少）超過 landFree，等車身落回地面才算一次；兩次扣分至少隔 landCool 秒
+  // （順著斜坡一路往下開，車身跟得上地面，不算落地）
+  landCd-=dt;hitCd-=dt;var gap=car.bodyY-targetY;
+  if(gap>landMax)landMax=gap;
+  if(gap<0.05){
+    if(landMax>HIT.landFree&&landCd<=0){var ex=landMax-HIT.landFree;landCd=HIT.landCool;hurt(Math.min(HIT.landHurtMax,2+ex*16),st,'重重落地⋯');damage(Math.min(HIT.landDmgMax,1+ex*10),'land');car.bodyVy-=Math.min(1.6,0.8+ex*2);say('重重落地');}
+    landMax=0;
+  }
+  var np=Math.atan2((hs[0]+hs[1])/2-(hs[2]+hs[3])/2,2.2),nr=Math.atan2((hs[0]+hs[2])/2-(hs[1]+hs[3])/2,1.72);
+  histT-=dt;if(histT<=0&&!quiet){histT=0.25;(car.hist||(car.hist=[])).push({x:car.x,z:car.z,th:car.th});if(car.hist.length>REWIND_SEC*4+4)car.hist.shift();}
+  rollWarnT-=dt;
+  if(MT==='hills'){   // 丘陵：側坡 25～40° 警告並慢慢側滑（可救回），超過 40° 持續 1.5 秒才翻車
+    var rd=Math.abs(nr)*180/Math.PI;
+    if(rd>HILL_ROLL.warnDeg&&rollWarnT<=0&&!quiet){rollWarnT=2.5;say(rd>HILL_ROLL.flipDeg?'側坡太斜了！快往上坡方向打':'側坡有點斜，小心側滑',1300);}
+    if(rd>HILL_ROLL.warnDeg&&!car.stalled&&!car.winchA){   // 往坡下側滑，越斜越快
+      var sp=HILL_ROLL.slideMin+(HILL_ROLL.slideMax-HILL_ROLL.slideMin)*clamp((rd-HILL_ROLL.warnDeg)/(HILL_ROLL.flipDeg-HILL_ROLL.warnDeg),0,1);
+      var lx=(ws[0][0]+ws[2][0]-ws[1][0]-ws[3][0]),lz=(ws[0][1]+ws[2][1]-ws[1][1]-ws[3][1]),ll=Math.hypot(lx,lz)||1,sg=nr>0?-1:1;
+      var sx=car.x+sg*lx/ll*sp*dt,sz=car.z+sg*lz/ll*sp*dt,stt=tileOf(sx,sz);
+      if(stt>=0&&W.surf[stt]!=='water'&&check(sx,sz,car.th,W.limUp,st).ok){car.x=sx;car.z=sz;}   // 完整檢查（之前只看石頭格，車會被滑進樹和石頭裡卡死）
+      if(car.aboard&&!quiet)hurt(HILL_ROLL.hurtRate*dt,st,'好斜⋯');
+    }
+    if(rd>HILL_ROLL.flipDeg){car.rollT=(car.rollT||0)+dt;if(car.rollT>=HILL_ROLL.flipSec){car.rollT=0;rollover();}}
+    else car.rollT=0;   // 回到 40° 以下，計時歸零
+  }else if(MT==='cliff'){   // 懸崖路：側傾、打滑都不算翻車，只有整台翻過來（或掉下山）才算
+    if(Math.abs(nr)>0.436&&Math.abs(car.v)>1&&rollWarnT<=0&&!quiet){rollWarnT=2.5;say('側傾很大，小心！',1200);}
+    if(Math.abs(nr)>FLIP_ROLL&&!car.winchPull&&!car.winchA)car.flipT=(car.flipT||0)+dt;else car.flipT=0;   // 絞盤收線中不判翻車（斜坡上車身很歪，會被當成翻過來而打斷收線）
+    if(car.flipT>0.4){car.flipT=0;startFlip(nr);}
+  }else{
+    if(Math.abs(nr)>0.436&&Math.abs(car.v)>1&&rollWarnT<=0&&!quiet){rollWarnT=2.5;say('側坡太斜了！',1200);}
+    if(Math.abs(nr)>0.61&&Math.abs(car.v)>1)rollover();
+  }
+  var prate=Math.abs(np-car.prevPitch)/dt;car.prevPitch=np;
+  car.pitch+=(np-car.pitch)*Math.min(1,dt*14);car.roll+=(nr-car.roll)*Math.min(1,dt*14);
+  if(car.aboard){var drain=(Math.max(0,Math.abs(a)-5)*0.35+Math.max(0,prate-0.35)*5+Math.max(0,Math.abs(nr)-TILT_HURT.free)*TILT_HURT.k)*dt;hurt(drain,st,'好晃⋯');
+    if(!matched&&!car.stalled&&Math.abs(car.v)>0.3&&req)hurt(((req==='rock'||req==='mud')?HIT.wrongHurtHard:HIT.wrongHurt)*dt,st,'好晃⋯模式不對');   // 選錯模式硬開（岩地、泥地最顛）
+    var lat=Math.abs(turn*car.v);if(lat>7)hurt((lat-7)*0.8*dt,st,'轉太急了⋯');}   // 急轉
+  if(!matched&&!car.stalled&&Math.abs(car.v)>0.3&&req)damage(HIT.wrongDmg*dt,'wrong');   // 選錯模式硬開傷車
+  tipT-=dt;hitAcc*=Math.max(0,1-dt*0.6);
+  if(car.aboard&&hitAcc>=1.2&&tipT<=0&&!quiet){say(lastCause,1400);tipT=2.2;hitAcc=0;}
+  // particles
+  if((spinning&&throttle)||(Math.abs(car.v)>1.5&&Math.random()<0.25)){
+    for(var k=2;k<4;k++){var t=tileOf(ws[k][0],ws[k][1]);if(t<0)continue;var s=W.surf[t];if(!spinning&&s!=='mud'&&s!=='sand'&&s!=='water'&&s!=='dirt')continue;
+      var cl=s==='water'?0xcfe3e0:SURF[s].color;var bx=-Math.sin(car.th)*(spinning?2.2:1),bz=-Math.cos(car.th)*(spinning?2.2:1);
+      emit(parts,pi++,ws[k][0],hs[k]+0.2,ws[k][1],cl,bx+(Math.random()-0.5)*1.5,1.5+Math.random()*2,bz+(Math.random()-0.5)*1.5,0.6+Math.random()*0.4);}
+  }
+  // audio
+  if(audio){var rpm=clamp(Math.abs(car.v)/top*0.85+Math.abs(throttle)*0.3+(spinning?0.45:0),0,1.5);var f=42+rpm*72;audio.o.frequency.setTargetAtTime(f,audio.A.currentTime,0.08);audio.o2.frequency.setTargetAtTime(f*0.5,audio.A.currentTime,0.08);audio.f.frequency.setTargetAtTime(260+rpm*380,audio.A.currentTime,0.1);}
+  return {st:st,ws:ws,hs:hs};
+}
+
+
+// ---------- 無線電 ----------
+// RS 存最近一次算出來的讀數，HUD、字幕、雜訊都讀它
+var DIFFS_GATE=false,quiet=false;   // DIFFS_GATE：出圖時讓機器人試開（Lu 2026-10-13：三種任務都不試開，格子檢查過就出圖）；quiet：快轉模擬時不出聲
+var simT=0;   // 模擬時間（秒），訊號起伏用它，除錯時可以快轉
+var RS={sq:false,ng:0,smoke:false,dist:0,angCos:1,antenna:1,ridge:0,high:0,sig:0,clar:0,shown:0},radioT=0;
+function radioReset(){RS.shown=0;radioT=1.5+Math.random()*2;talking=false;RS.sq=false;RS.ng=0;$('radioLine').textContent='';}
+// 山稜：沿車→目標連線取樣，地形高過連線就算擋住，回傳 0（沒擋）～1（完全擋住）
+function ridgeBlock(tp,d,extra){
+  var h0=groundH(car.x,car.z)+RADIO.eyeH,h1=tp.y+RADIO.eyeH+(extra||0),worst=0,n=clamp(Math.ceil(d/RADIO.ridgeStep),8,60);
+  for(var k=1;k<n;k++){
+    var u=k/n,x=car.x+(tp.x-car.x)*u,z=car.z+(tp.z-car.z)*u;
+    var over=groundH(x,z)-(h0+(h1-h0)*u)-RADIO.ridgeClear;
+    if(over>worst)worst=over;
+  }
+  return clamp(worst/RADIO.ridgeFull,0,1);
+}
+function radioMeasure(){
+  var tp=W.targetPos,dx=tp.x-car.x,dz=tp.z-car.z,d=Math.hypot(dx,dz);
+  // 天線：車頭方向 (sin th, cos th) 和目標方向的夾角
+  var c=d<0.01?1:(Math.sin(car.th)*dx+Math.cos(car.th)*dz)/d;
+  var ant=Math.pow((1+c)/2,RADIO.antennaPow);ant=RADIO.antennaMin+(1-RADIO.antennaMin)*ant;
+  var rb=ridgeBlock(tp,d),hi=Math.max(0,groundH(car.x,car.z)-W.hBase);
+  var rng=RADIO.range*(1+RADIO.heightGain*hi);            // 站得高，收得遠
+  var base=Math.pow(clamp(1-d/rng,0,1),RADIO.falloff);
+  // 衰落：幾個慢速正弦疊起來的起伏；開車時全幅，停車時只剩 25%（RADIO.fadeAmp＝0 就不跳）
+  var tt=simT,fn=(Math.sin(tt*2.1+1.1)+0.7*Math.sin(tt*4.7+2.7)+0.8*Math.sin(tt*0.8+0.3))/2.5;
+  var fade=1+RADIO.fadeAmp*(0.25+0.75*clamp(Math.abs(car.v)/5,0,1))*fn;
+  var faint=RADIO.faintAmp*ant*(1-RADIO.ridgeLoss*rb)*clamp(1-d/(MAP_M*RADIO.faintRatio),0,1)*(0.6+0.4*fade);   // 遠處微弱的方向訊號
+  var sig=clamp(base*ant*(1-RADIO.ridgeLoss*rb)*fade+faint,0,1);
+  var antQ=(ant-RADIO.antennaMin)/(1-RADIO.antennaMin),hQ=clamp(hi/RADIO.clarHeightRef,0,1);
+  var quality=RADIO.clarBase+RADIO.clarHeight*hQ+RADIO.clarAnt*antQ;
+  var clar=clamp(quality*(1-RADIO.clarRidge*rb)*(1-RADIO.clarDistW*clamp(d/(MAP_M*RADIO.clarDistRange),0,1))*1.08,0,1);
+  RS.dist=d;RS.angCos=c;RS.antenna=ant;RS.ridge=rb;RS.high=hi;RS.sig=sig;RS.clar=clar;
+}
+// 「喀」：按下／放開通話鍵、靜噪打開的短促聲
+function radioClick(){
+  if(!audio||quiet||!audio.rg)return;
+  var A=audio.A,src=A.createBufferSource(),g=A.createGain(),t=A.currentTime;
+  src.buffer=audio.nbuf;g.gain.setValueAtTime(0.0001,t);g.gain.linearRampToValueAtTime(0.16,t+0.004);g.gain.exponentialRampToValueAtTime(0.0001,t+0.035);
+  src.connect(g);g.connect(audio.rg);src.start(t,Math.random()*1.5,0.04);
+}
+// 每個保留下來的詞配一聲短促的「人聲」嗶，聽起來像斷斷續續的講話。訊號越強越大聲
+function voiceBlips(kept){
+  if(!audio||quiet||!audio.rg)return;
+  var A=audio.A,t=A.currentTime+0.12,amp=0.05*(0.2+0.8*RS.sig);
+  kept.forEach(function(k,n){
+    if(!k)return;
+    var o=A.createOscillator(),g=A.createGain();o.type='triangle';o.frequency.value=300+Math.random()*160;
+    var t0=t+n*0.26;g.gain.setValueAtTime(0.0001,t0);g.gain.linearRampToValueAtTime(amp,t0+0.03);g.gain.exponentialRampToValueAtTime(0.0001,t0+0.2);
+    o.connect(g);g.connect(audio.rg);o.start(t0);o.stop(t0+0.22);
+  });
+}
+// 每次發話：按清晰度隨機把詞換成「⋯」，每次掉的詞都不同。靜噪沒打開就不發聲、不出字幕
+function radioSpeak(){
+  var line=W.scenario.line,kept=[],txt='—';
+  if(RS.sq){
+    kept=line.map(function(){return RS.clar>=0.98||Math.random()<RS.clar;});
+    txt=line.map(function(w,n){return kept[n]?w:'⋯';}).join('');
+  }
+  $('radioLine').textContent=txt;voiceBlips(kept);
+  if(MOBILE.matches){   // 手機：有訊號講話才浮現一條細字幕，講完幾秒淡出；沒聲音時不佔位置
+    var sb=$('radioSub');clearTimeout(subT);
+    if(RS.sq){sb.style.opacity=1;subT=setTimeout(function(){sb.style.opacity=0;},RADIO.talkLen[1]*1000+3500);}else sb.style.opacity=0;
+  }
+}
+var subT=0;
+var talking=false,talkLeft=0;
+function radioUpdate(dt){
+  radioMeasure();
+  RS.shown+=(RS.sig-RS.shown)*Math.min(1,dt*RADIO.barSmooth);
+  // 信號煙：夠近、沒被山稜擋住才看得到；困難版間歇出現
+  RS.smoke=RS.dist<RADIO.smokeRatio*RADIO.range&&ridgeBlock(W.targetPos,RS.dist,9)<0.5&&((simT/9)%1)<RADIO.smokeDuty;
+  // 靜噪：訊號超過門檻才打開（「喀」一聲），掉到門檻的 70% 以下才關
+  if(!RS.sq&&RS.sig>=RADIO.minSignal){RS.sq=true;radioClick();}
+  else if(RS.sq&&RS.sig<RADIO.minSignal*0.7)RS.sq=false;
+  // 間歇發話：每 talkGap 秒一次，每次 talkLen 秒；開頭和結尾各一聲「喀」
+  radioT-=dt;
+  if(!talking&&radioT<=0){
+    talking=true;talkLeft=RADIO.talkLen[0]+Math.random()*(RADIO.talkLen[1]-RADIO.talkLen[0]);
+    radioT=RADIO.talkGap[0]+Math.random()*(RADIO.talkGap[1]-RADIO.talkGap[0]);
+    if(RS.sq)radioClick();radioSpeak();
+  }else if(talking){talkLeft-=dt;if(talkLeft<=0){talking=false;if(RS.sq)radioClick();}}
+  // 雜訊只在發話中出現；訊號越弱雜訊越大，越強越小
+  RS.ng=(talking&&RS.sq)?RADIO.noiseMax*Math.pow(clamp(1-RS.sig,0.08,1),1.2):0;
+  if(!quiet&&audio&&audio.ng){audio.ng.gain.setTargetAtTime(RS.ng,audio.A.currentTime,0.02);audio.nf.frequency.setTargetAtTime(900+RS.sig*1800,audio.A.currentTime,0.15);}
+}
+
+// ---------- 方位帶：隨車頭轉的刻度帶（可視 180°），回家的方向用琥珀色標示；不是地圖也不是雷達 ----------
+var compassCv=$('compass'),cx2=compassCv.getContext('2d');
+function drawCompass(){
+  var dpr=2,cw=compassCv.clientWidth||520,ch=compassCv.clientHeight||48;
+  if(compassCv.width!==cw*dpr||compassCv.height!==ch*dpr){compassCv.width=cw*dpr;compassCv.height=ch*dpr;}
+  var k=ch*dpr/96;cx2.setTransform(k,0,0,k,0,0);   // 以高 96 的座標畫，隨實際大小縮放
+  var w=cw*dpr/k,h=96,half=w/2-30,hp=tileCenter(1.5,1.5);
+  var css=getComputedStyle(document.documentElement);
+  function wrapA(a){while(a>Math.PI)a-=2*Math.PI;while(a<-Math.PI)a+=2*Math.PI;return a;}
+  cx2.clearRect(0,0,w,h);
+  cx2.fillStyle='rgba(36,30,28,.84)';cx2.beginPath();cx2.roundRect?cx2.roundRect(0,0,w,h,20):cx2.rect(0,0,w,h);cx2.fill();
+  cx2.strokeStyle='rgba(243,233,216,.18)';cx2.lineWidth=2;cx2.stroke();
+  function X(rel){return w/2-rel/(Math.PI/2)*half;}   // rel>0＝在左邊（要向左轉）
+  cx2.textAlign='center';cx2.textBaseline='middle';
+  for(var d=0;d<360;d+=15){
+    var rel=wrapA(d*Math.PI/180-car.th);if(Math.abs(rel)>Math.PI/2)continue;
+    var x=X(rel),major=d%90===0,mid=d%45===0,len=major?24:mid?16:9;
+    cx2.strokeStyle='rgba(243,233,216,'+(major?.9:.45)+')';cx2.lineWidth=major?3:2;cx2.beginPath();cx2.moveTo(x,h-8);cx2.lineTo(x,h-8-len);cx2.stroke();
+    if(major){cx2.fillStyle='#f3e9d8';cx2.font='700 26px sans-serif';cx2.fillText(['北','東','南','西'][d/90],x,24);}
+  }
+  cx2.strokeStyle='rgba(243,233,216,.7)';cx2.lineWidth=3;cx2.beginPath();cx2.moveTo(w/2,h-4);cx2.lineTo(w/2,h-14);cx2.stroke();   // 車頭
+  var rh=wrapA(Math.atan2(hp[0]-car.x,hp[1]-car.z)-car.th),amber='#e8b04a';
+  cx2.fillStyle=amber;cx2.font='700 24px sans-serif';
+  if(Math.abs(rh)<=Math.PI/2){var hx=X(rh);cx2.beginPath();cx2.moveTo(hx-12,6);cx2.lineTo(hx+12,6);cx2.lineTo(hx,24);cx2.closePath();cx2.fill();cx2.fillText('家',hx,h-26);}
+  else{var left=rh>0,ax=left?26:w-26,dir=left?-1:1;cx2.beginPath();cx2.moveTo(ax+dir*14,h/2);cx2.lineTo(ax-dir*10,h/2-14);cx2.lineTo(ax-dir*10,h/2+14);cx2.closePath();cx2.fill();cx2.fillText('家',ax-dir*36,h/2);}
+}
+// ---------- loop ----------
+var clock=new THREE.Clock(),hudT=0,blink=0,overview=false,closeup=false;
+function frame(){
+  requestAnimationFrame(frame);
+  var dt=Math.min(clock.getDelta(),1/30);
+  simT+=dt;
+  var st=stats(),ph=null;
+  if(audio)audio.g.gain.setTargetAtTime(playing&&car.fallT<=0?0.03:0,audio.A.currentTime,0.15);   // 引擎聲只在開車時有
+  if(playing){ph=physics(dt/2);ph=physics(dt/2);}
+  else{var w0=wheelWorld(car.x,car.z,car.th);ph={st:st,ws:w0,hs:w0.map(function(w){return groundH(w[0],w[1]);})};}
+  // car visuals
+  updateModeVisual(dt);
+  carG.position.set(car.x,car.bodyY+vis.lift,car.z);carG.rotation.set(-car.pitch,car.th,car.roll);   // 車身抬高／下沉只是外觀
+  var reff=0.42*vis.wr;
+  for(var k=0;k<4;k++){var w=wheels[k];w.piv.position.set(ph.ws[k][0],ph.hs[k]+reff,ph.ws[k][1]);w.piv.rotation.y=car.th;w.spin.rotation.x+=car.v*dt/reff;}
+  blink+=dt;
+  landmarks.forEach(function(g){if(g.userData.hub)g.userData.hub.rotation.z+=dt*0.8;});
+  if(car.aboard){var on=Math.floor(blink*3)%2===0;car.lightbar.material.emissive.setHex(on?0xff3a1e:0xffa020);}else car.lightbar.material.emissive.setHex(0x220000);
+  if(car.winch&&anchor){var fside=((anchor.x-car.x)*Math.sin(car.th)+(anchor.z-car.z)*Math.cos(car.th))<0&&car.winchA?-1.9:1.9,f=localToWorld(car.x,car.z,car.th,0,fside);anchorMark.position.set(anchor.x,groundH(anchor.x,anchor.z)+0.15,anchor.z);var pa=rope.geometry.attributes.position;pa.setXYZ(0,f[0],car.bodyY-0.02,f[1]);pa.setXYZ(1,anchor.x,anchor.y+0.9,anchor.z);pa.needsUpdate=true;}
+  else if(car.winchPull){var fb=localToWorld(car.x,car.z,car.th,0,0),pb=rope.geometry.attributes.position;pb.setXYZ(0,fb[0],car.bodyY+0.3,fb[1]);pb.setXYZ(1,car.winchPull.x,groundH(car.winchPull.x,car.winchPull.z)+0.4,car.winchPull.z);pb.needsUpdate=true;}   // 拉向路面的繩子
+  // hiker + flare
+  if(W&&!car.aboard){
+    targetObj.userData.arm.rotation.z=Math.sin(blink*6)*0.5;
+    flareT-=dt;if(flareT<=0&&debugMarker){flareT=0.14;var tp=W.targetPos;emit(smoke,si++,tp.x-0.6,tp.y+0.3,tp.z,0xe8705e,(Math.random()-0.5)*0.3,1.6+Math.random()*0.5,(Math.random()-0.5)*0.3,3.4,2.2);}
+    var d=Math.hypot(W.targetPos.x-car.x,W.targetPos.z-car.z);
+    if(playing)radioUpdate(dt);
+    if(playing&&d<3.4&&Math.abs(car.v)<1.2){
+      car.aboard=true;targetObj.visible=false;releaseWinch();
+      $('mission').textContent='載著登山客，平穩地開回有燈柱的小鎮';$('passRow').hidden=false;$('radioRow').hidden=true;$('radioSub').style.opacity=0;showMission();if(audio&&audio.ng)audio.ng.gain.setTargetAtTime(0,audio.A.currentTime,0.1);
+      say('乘客上車了。回程開穩一點',2600);
+    }
+  }
+  if(townPillar){var pd=Math.hypot(townPillar.position.x-car.x,townPillar.position.z-car.z);townPillar.material.opacity=(car.aboard?0.26+Math.sin(blink*2)*0.05:0.1)*clamp((pd-3)/8,0.15,1);}
+  if(playing&&car.aboard){var ct=tileOf(car.x,car.z);if(ct>=0&&inTown(Math.floor(ct/N),ct%N)&&Math.abs(car.v)<1.5)finish();}
+  stepParts(parts,dt,9);stepParts(smoke,dt,0);updateSmoke();drawCompass();updateRockfall(dt);
+  // camera
+  camT.x+=(car.x-camT.x)*Math.min(1,dt*4);camT.z+=(car.z-camT.z)*Math.min(1,dt*4);camT.y+=(car.bodyY-camT.y)*Math.min(1,dt*3);
+  // 開車視角：鏡頭在車後上方、俯角約 40°，跟著車頭方向轉（慢慢跟，不暈）；勘查時才切到固定的斜俯視
+  var dH=car.th-camHd;while(dH>Math.PI)dH-=2*Math.PI;while(dH<-Math.PI)dH+=2*Math.PI;camHd+=dH*Math.min(1,dt*2.6);
+  // 開車視角：鏡頭在車後上方、俯角約 40°。勘查時鏡頭慢慢升高、看寬一點（不用停車）；關掉再慢慢回來
+  scoutK+=((scouting?1:0)-scoutK)*Math.min(1,dt*1.6);
+  if(towArm>0){towArm-=dt;if(towArm<=0)setTog('tTow',false,'');}
+  var fovW=48+10*scoutK;if(Math.abs(camera.fov-fovW)>0.05){camera.fov=fovW;camera.updateProjectionMatrix();}
+  var lfx=Math.sin(camHd),lfz=Math.cos(camHd),bk=(25-7*scoutK)*MK,hg=(26+12*scoutK)*MK,la=(6-3*scoutK)*MK;
+  var cx_=car.x-lfx*bk,cz_=car.z-lfz*bk,cyBase=car.bodyY+hg;
+  // 防穿牆：車到鏡頭之間若被山壁擋住，就把鏡頭往上拉到看得到車（慢慢升、更慢降，不跳）
+  var need=0;for(var si=1;si<=10;si++){var tt5=si/10,gh5=groundH(car.x+(cx_-car.x)*tt5,car.z+(cz_-car.z)*tt5)+2.2,cy5=car.bodyY+1.5;need=Math.max(need,(gh5-cy5*(1-tt5))/tt5);}
+  var tgtL=clamp(need-cyBase,0,110);camLift+=(tgtL-camLift)*Math.min(1,dt*(tgtL>camLift?5:1.2));
+  camera.position.set(cx_,cyBase+camLift,cz_);camera.lookAt(car.x+lfx*la,car.bodyY,car.z+lfz*la);
+  if(scouting){scoutT-=dt;if(scoutT<=0){buildScout();scoutT=0.3;}}   // 色層只畫在車子周圍，跟著車更新
+  if(closeup){var cs_=Math.sin(car.th),cc_=Math.cos(car.th);camera.position.set(car.x-cs_*9+cc_*6.5,car.bodyY+4.2,car.z-cc_*9-cs_*6.5);camera.lookAt(car.x,car.bodyY-0.2,car.z);}   // 除錯：車子特寫（截圖用）
+  if(overview){camera.position.set(0,MAP_M*1.7,-MAP_M*0.9);camera.lookAt(0,0,0);}   // 除錯：整張地圖俯視
+  applyLighting(clockMin);
+  sun.position.set(camT.x+SUNDIR.x,camT.y+SUNDIR.y,camT.z+SUNDIR.z);sun.target.position.copy(camT);
+  // hud
+  toastT-=dt;if(toastT<=0&&toastMsg){$('toast').classList.remove('show');toastMsg='';}
+  hudT-=dt;
+  if(hudT<=0&&W){hudT=0.1;
+    var t=tileOf(car.x,car.z);if(t>=0)$('surfTxt').textContent=SURF[W.surf[t]].name;
+    $('clock').textContent=fmtClock(clockMin);
+    $('tTow').hidden=!playing;   // 絞盤鍵一直顯示（跟其他按鈕一樣；沒在開車時按了沒反應）
+    if(!car.aboard){var bars=RS.shown<RADIO.hudMin?0:clamp(Math.ceil(RS.shown*5),1,5);
+      document.querySelectorAll('#bars i').forEach(function(el,n){el.classList.toggle('on',n<bars);});
+      $('radioTxt').textContent=debugMarker?('距離 '+RS.dist.toFixed(0)+' m　訊號 '+RS.sig.toFixed(2)+'　清晰 '+RS.clar.toFixed(2)):(bars>=5?'很近了':'');}
+    else{var c=Math.round(car.comfort);$('comfortNum').textContent=c;var fl=$('comfortFill');fl.style.width=c+'%';fl.style.background=c>=70?'var(--ok)':c>=35?'var(--accent)':'var(--bad)';}
+  }
+  renderer.render(scene,camera);
+}
+addEventListener('resize',function(){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+
+// ---------- 除錯：機器人（用來比較難度，不影響遊戲）----------
+// runBot('omni')＝知道目標在哪、會找路（格子 BFS 最短路徑）的完美駕駛，量的是「地形」本身的難度；
+// runBot('radio')＝理想的無線電玩家：每 4 秒把天線轉一圈挑訊號最強的方向（訊號起伏和山稜照樣影響它），往那個方向 45 公尺處找路開，
+// 沒訊號就逛到隨機地點。都用固定時間步長快轉模擬，回傳模擬秒數（上限 maxT）。真人時間請 Lu 實測。
+function botPath(goalX,goalZ){   // BFS：從車所在格走到離 (goalX,goalZ) 最近的可到達格，回傳格子中心座標清單。先把障礙物周圍一格也當障礙（車比較寬），走不到再放寬
+  function run(inflate){
+    var st=tileOf(car.x,car.z),seen=new Int32Array(N*N).fill(-1),q=[st],DI=[1,-1,0,0],DJ=[0,0,1,-1],best=st,bd=1e9;seen[st]=st;
+    for(var h=0;h<q.length;h++){
+      var c=q[h],ci=(c/N)|0,cj=c%N,cc=tileCenter(ci,cj),dd=Math.hypot(cc[0]-goalX,cc[1]-goalZ);
+      if(dd<bd){bd=dd;best=c;}
+      for(var d=0;d<4;d++){
+        var ni=ci+DI[d],nj=cj+DJ[d];if(ni<0||nj<0||ni>=N||nj>=N)continue;
+        var n=idx(ni,nj);if(seen[n]>=0||W.solid[n]||W.depth[n]>0.9||Math.abs(W.level[n]-W.level[c])>W.limUp)continue;
+        if(inflate&&W.treeAt[n])continue;   // 繞開有樹的格子（碰撞是真的，樹幹會撞到）
+        if(inflate){var bad=false;for(var a=-1;a<=1&&!bad;a++)for(var b=-1;b<=1;b++){var x=ni+a,y=nj+b;if(x>=0&&y>=0&&x<N&&y<N&&(W.solid[idx(x,y)]||Math.abs(W.level[idx(x,y)]-W.level[n])>W.limUp)&&!(x<=3&&y<=3)){bad=true;break;}}if(bad)continue;}
+        seen[n]=c;q.push(n);
+      }
+    }
+    var path=[];for(var c2=best;c2!==st;c2=seen[c2])path.push(tileCenter((c2/N)|0,c2%N));
+    return {path:path.reverse(),bd:bd};
+  }
+  var a1=run(true),a2=run(false);
+  return (a1.bd<=a2.bd+12?a1:a2).path;
+}
+function runBot(kind,maxT){   // 機器人跑的時候不出聲、不扣車況和乘客狀況
+  var q0=quiet;quiet=true;var r=runBotInner(kind,maxT);quiet=q0;return r;
+}
+function runBotInner(kind,maxT){
+  function wrap(a){while(a>Math.PI)a-=2*Math.PI;while(a<-Math.PI)a+=2*Math.PI;return a;}
+  function step(dt){simT+=dt;physics(dt/2);physics(dt/2);if(!car.aboard)radioUpdate(dt);}
+  step(1/30);step(1/30);
+  var clI=0,BR=mulberry32(W.seed^0x9e37),tp=W.targetPos,dt=1/30,t=0,bmode='go',m=0,lx=car.x,lz=car.z,stuckT=0,rdir=1,stucks=0,first=null,nextDec=0,path=[],aim=[tp.x,tp.z],pathT=-9,escT=0,escHd=0;
+  function rnd(){return [(BR()-0.5)*MAP_M*0.8,(BR()-0.5)*MAP_M*0.8];}
+  var wp=rnd();
+  keys.gas=keys.brake=keys.left=keys.right=false;
+  while(t<maxT){
+    mode=curReq();   // 機器人：自動選對模式
+    var sig=RS.sig,d=Math.hypot(tp.x-car.x,tp.z-car.z);
+    if(d<3.4&&Math.abs(car.v)<1.2)break;
+    if(sig>=0.05&&first===null)first=t;
+    if(bmode==='go'){
+      if(kind==='omni')aim=[tp.x,tp.z];
+      else if(t>=nextDec){
+        nextDec=t+4;var th0=car.th,best=-1,bh=th0;
+        for(var k=0;k<16;k++){car.th=th0+k*Math.PI/8;radioMeasure();if(RS.sig>best){best=RS.sig;bh=car.th;}}
+        car.th=th0;radioMeasure();
+        if(best<0.05){if(Math.hypot(wp[0]-car.x,wp[1]-car.z)<25)wp=rnd();aim=wp;}
+        else{var r=best>0.6?25:45;aim=[car.x+Math.sin(bh)*r,car.z+Math.cos(bh)*r];}
+        pathT=-9;
+      }
+      if(t-pathT>=2){path=botPath(aim[0],aim[1]);pathT=t;}
+      while(path.length>1&&Math.hypot(path[0][0]-car.x,path[0][1]-car.z)<5)path.shift();
+      var tgt;
+      if(W.cl&&kind==='omni'){   // 懸崖路：沿著路中心線往前看 6 m
+        var cpts=W.cl.pts,bd5=1e9,bk5=clI;
+        for(var q5=clI;q5<Math.min(cpts.length,clI+40);q5++){var d5=Math.hypot(cpts[q5][0]-car.x,cpts[q5][1]-car.z);if(d5<bd5){bd5=d5;bk5=q5;}}
+        clI=bk5;var la5=Math.min(cpts.length-1,clI+6);tgt=[cpts[la5][0],cpts[la5][1]];
+      }else tgt=path.length>1?path[W.type==='cliff'?0:Math.min(1,path.length-1)]:aim;   // 懸崖路：對準下一格的中心，不抄近路
+      if(d<12)tgt=[tp.x,tp.z];
+      var e=wrap(Math.atan2(tgt[0]-car.x,tgt[1]-car.z)-car.th);
+      if(t<escT)e=wrap(escHd-car.th);   // 剛脫困：先朝別的方向開一下
+      if(Math.abs(e)>1.5&&Math.abs(car.v)<3.5){keys.gas=false;keys.brake=true;keys.left=e<0;keys.right=e>0;}
+      else{keys.brake=false;keys.gas=true;keys.left=e>0.1;keys.right=e<-0.1;
+        if(d<9||(kind!=='omni'&&sig>0.9)){keys.gas=car.v<2.5;keys.brake=car.v>3.5;}}
+      if(t-stuckT>=3){var mv=Math.hypot(car.x-lx,car.z-lz);lx=car.x;lz=car.z;stuckT=t;if(mv<1.5){bmode='rev';m=1.6;rdir=BR()<0.5?1:-1;stucks++;}}
+    }else{keys.gas=false;keys.brake=true;keys.left=rdir>0;keys.right=rdir<=0;m-=dt;if(m<=0){bmode='go';pathT=-9;lx=car.x;lz=car.z;stuckT=t;escT=t+2.5;escHd=car.th+rdir*(0.9+BR()*0.7);}}
+    step(dt);t+=dt;
+  }
+  keys.gas=keys.brake=keys.left=keys.right=false;
+  return {t:Math.round(t),found:t<maxT,first:first===null?null:Math.round(first),stucks:stucks};
+}
+
+// ---------- 除錯：地形比例（整張圖、機器人路徑、起點到傷者的直線各一份）----------
+function measureTerrain(diff,n){
+  var CAT={grass:'草',dirt:'草',town:'草',rock:'岩',gravel:'岩',sand:'沙',mud:'泥',water:'河'};
+  function z(){return {草:0,岩:0,沙:0,泥:0,河:0};}
+  setDifficulty(diff);var area=z(),path=z(),line=z(),hitP={沙:0,泥:0,河:0},hitL={沙:0,泥:0,河:0},tot=0,ptot=0,ltot=0,tries=0;
+  for(var k=0;k<n;k++){
+    newMission();tries+=W.reachTries;var tp=W.targetPos,i,j,q;
+    for(i=0;i<N;i++)for(j=0;j<N;j++){if(i<4&&j<4)continue;area[CAT[W.surf[i*N+j]]]++;tot++;}
+    var p=botPath(tp.x,tp.z),sp={};
+    p.forEach(function(c){var t=Math.floor((c[0]+HALF)/TILE)*N+Math.floor((c[1]+HALF)/TILE),ct=CAT[W.surf[t]];path[ct]++;ptot++;sp[ct]=1;});
+    for(q in hitP)if(sp[q])hitP[q]++;
+    var dx=tp.x-car.x,dz=tp.z-car.z,d=Math.hypot(dx,dz),sl={};
+    for(var s2=0;s2<=d;s2+=2){var t2=tileOf(car.x+dx*s2/d,car.z+dz*s2/d),ct2=CAT[W.surf[t2]];line[ct2]++;ltot++;sl[ct2]=1;}
+    for(q in hitL)if(sl[q])hitL[q]++;
+  }
+  function pc(o,t){var r={};for(var key in o)r[key]=Math.round(100*o[key]/t)+'%';return r;}
+  return {area:pc(area,tot),path:pc(path,ptot),line:pc(line,ltot),pathHasEach:hitP,lineHasEach:hitL,reachTriesAvg:+(tries/n).toFixed(1),of:n};
+}
+
+newMission();applyMods();frame();
+window.__rescueDebug={check:function(x,z,th,lim){return check(x,z,th,lim===undefined?W.limUp:lim,stats());},aim:function(v){winchAimDbg=v;},anchorRel:function(){return anchor?[+(anchor.x-car.x).toFixed(1),+(anchor.z-car.z).toFixed(1),anchorMark.visible]:null;},camHd:function(){return camHd;},trip:function(){return trip;},startFlip:startFlip,doRewind:doRewind,hurtLog:hurtLog,PASS_K:PASS_K,winchStart:winchStart,winchStop:winchStop,scoutGroup:scoutGroup,frame:frame,camPos:function(){return [camera.position.x,camera.position.y,camera.position.z];},gH:groundH,rockSim:function(aboard,secs,k){var k0=ROCK_RETURN_K,p0=playing;if(k!==undefined)ROCK_RETURN_K=k;playing=true;car.aboard=aboard;rocksReset();var n0=rockSpawnN,pts=W.roadPts,L=pts.length;for(var tt=0;tt<L/5;tt+=0.1){var q=pts[Math.min(L-1,Math.floor(5*tt))];if(aboard)q=pts[Math.max(0,L-1-Math.floor(5*tt))];car.x=q.x;car.z=q.z;updateRockfall(0.1);}ROCK_RETURN_K=k0;playing=p0;return rockSpawnN-n0;},dmgLog:dmgLog,runBotLive:function(k,m){return runBotInner(k,m);},HIT:HIT,SCORE:SCORE,DAY:DAY,HILL_ROLL:HILL_ROLL,getSel:function(){return selType;},genRatios:function(n){var r=[];for(var k=0;k<n;k++){var w=generate((Math.random()*1e9)|0);r.push(+(reachable(w)?routeRatio(w):0).toFixed(2));}return r;},camInfo:function(){return {y:camera.position.y,gh:groundH(camera.position.x,camera.position.z),lift:camLift,scoutK:scoutK};},scoutInfo:function(){var m=scoutGroup.children[0];if(!m)return null;var a=m.geometry.attributes.position,mn=[1e9,1e9],mx=[-1e9,-1e9];for(var i=0;i<a.count;i++){mn[0]=Math.min(mn[0],a.getX(i));mx[0]=Math.max(mx[0],a.getX(i));mn[1]=Math.min(mn[1],a.getZ(i));mx[1]=Math.max(mx[1],a.getZ(i));}return {dxMin:+(mn[0]-car.x).toFixed(0),dxMax:+(mx[0]-car.x).toFixed(0),dzMin:+(mn[1]-car.z).toFixed(0),dzMax:+(mx[1]-car.z).toFixed(0),tris:a.count/3};},setMT:function(t){MT=t;},getMT:function(){return MT;},forceRock:function(){spawnRockWarn();},rocks:function(){var lats=rockDyn.map(function(d){var best=null,bd=1e9;W.roadPts.forEach(function(p){var dd=Math.hypot(p.x-d.o.x,p.z-d.o.z);if(dd<bd){bd=dd;best=p;}});return +((d.o.x-best.x)*best.nx+(d.o.z-best.z)*best.nz).toFixed(1);});return {warn:rockWarn.length,fall:rockFall.length,dyn:rockDyn.length,lats:lats};},startFall:startFall,rollover:rollover,buildScout:buildScout,setScout:setScout,game:game,startTrip:startTrip,showTown:showTown,getClock:function(){return clockMin;},setClock:function(m){clockMin=m;},applyLighting:applyLighting,repairCar:repairCar,finishNow:finish,terrain:measureTerrain,reachable:reachable,setCloseup:function(on){closeup=on;},settleVis:function(n){for(var i=0;i<n;i++)updateModeVisual(1/30);},vis:vis,botPath:botPath,forceMode:function(m){mode=m;applyMods();},curReq:curReq,stalled:function(){return car.stalled;},winchOn:function(){return car.winch;},isTalking:function(){return talking;},camD:function(){return camD;},renderInfo:function(){return renderer.info.render;},DIFFS:DIFFS,runBot:runBot,step:function(dt){simT+=dt;physics(dt/2);physics(dt/2);if(!car.aboard)radioUpdate(dt);},setDifficulty:setDifficulty,newMission:newMission,keys:keys,car:car,RADIO:RADIO,RS:RS,getW:function(){return W;},measure:radioMeasure,speak:radioSpeak,setOverview:function(on){overview=on;scene.fog=on?null:new THREE.Fog(0x8a6a72,70,150);var k=on?MAP_M/40:1;targetObj.scale.setScalar(k);carG.scale.setScalar(k);},MAP_M:MAP_M,N:N,TILE:TILE};   // 除錯用：從 console 看數值、搬車
+})();
+</script>
+</body>
+</html>

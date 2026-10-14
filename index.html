@@ -1585,7 +1585,7 @@ function say(msg,ms){var el=$('toast');if(msg!==toastMsg){el.textContent=msg;toa
 function setTog(id,on,txt){var el=$(id);el.classList.toggle('on',!!on);var em=el.querySelector('em');if(em)em.textContent=txt;}
 
 // ---------- mission ----------
-var MK=MOBILE.matches?1.2:1,CAMOFF=MOBILE.matches?1.6*MK:0;   // 手機鏡頭拉遠倍率（車太大、看到的路面太少）。朋友版 1.2（開發版 1.5）：手機瀏覽器看到整個畫面，Claude app 上面被標題列蓋掉一截、等於放大，1.2 在瀏覽器裡看起來才跟 app 裡差不多（Lu 2026-10-14）
+var MK=MOBILE.matches?1.0:1,CAMOFF=MOBILE.matches?1.6*MK:0;   // 手機鏡頭拉遠倍率（車太大、看到的路面太少）。朋友版 1.0（開發版 1.5）：手機瀏覽器看到整個畫面，Claude app 上面被標題列蓋掉一截、等於放大；Lu 在手機瀏覽器試過 1.2 還是太小（2026-10-14）
 var camHd=0,camLift=0,scoutK=0,scoutT=0;
 var CAM_FOLLOW=0.9,camFixed=false,camFixedHd=0;   // CAM_FOLLOW：鏡頭跟車頭的速度（原本 2.6，太快會暈）
 try{camFixed=localStorage.getItem('camFixed')==='1';}catch(e){}

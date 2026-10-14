@@ -2038,7 +2038,7 @@ function physics(dt){
   var pitch=Math.atan2((hs[0]+hs[1])/2-(hs[2]+hs[3])/2,2.2);
   // 地形與模式：要的模式選對才正常，選錯極速剩 SLOW（不會停）；河裡沒選「升高」就卡住（只能用絞盤）
   var req=curReq(),matched=(mode===req),inWater=req==='river';
-  car.stalled=inWater&&mode!=='river';
+  car.stalled=false;   // 河裡沒選「升高」不再卡死（Lu 2026-10-14）：跟其他地形一樣，模式不對只剩 SLOW 的速度
   var T=0.9*9.8*Math.cos(pitch),drag=0.3;
   var grav=9.8*Math.sin(pitch);
   var tiltK=1;

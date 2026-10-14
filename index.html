@@ -97,6 +97,11 @@ button:focus-visible,input:focus-visible+span{outline:2px solid var(--accent);ou
 .reslist li.total{border-bottom:0;font-size:17px;padding-top:8px;}
 .sharetxt{white-space:pre-wrap;font:13px/1.6 inherit;font-family:inherit;background:rgba(243,233,216,.06);border-radius:10px;padding:10px 12px;margin:4px 0 14px;user-select:text;-webkit-user-select:text;}
 #final .go.alt{margin-top:8px;}
+.seedrow{display:flex;align-items:center;justify-content:center;gap:10px;margin:0 0 4px;font-size:14px;color:var(--ink-dim);}   /* 朋友版：開場卡片的地圖種子 */
+.seedrow input{width:8.5em;padding:8px 10px;border-radius:8px;border:1px solid var(--panel-edge);background:rgba(243,233,216,.08);color:var(--ink);font:inherit;font-size:16px;text-align:center;letter-spacing:.08em;}
+.seedrow input::placeholder{color:var(--ink-dim);letter-spacing:0;font-size:14px;}
+.seedrow input:focus{outline:2px solid var(--accent);outline-offset:1px;}
+.introcard .seedfrom{text-align:center;margin:0 0 4px;}
 #passRow .meter{height:12px;}
 #passRow .lbl{font-weight:700;color:var(--ink);}
 .seg3{display:flex;gap:8px;margin:4px 0 8px;}
@@ -229,9 +234,7 @@ button:focus-visible,input:focus-visible+span{outline:2px solid var(--accent);ou
   <div class="row" id="passRow" hidden><span class="lbl">乘客狀況</span><span class="meter"><b id="comfortFill"></b></span><strong id="comfortNum">100</strong></div>
   <button class="mobonly" id="menuBtn" aria-label="選單">⋯</button>
   <div class="menuwrap" id="menuWrap">
-  <div class="row diffrow" id="diffRow"><span class="lbl">難度</span><span class="seg"><button id="diff_easy">簡單</button><button id="diff_normal">普通</button><button id="diff_hard">困難</button></span></div>
     <div class="row camrow"><span class="lbl">鏡頭</span><span class="seg"><button id="cam_follow">跟著轉</button><button id="cam_fixed">固定方向</button></span></div>
-    <div class="row camrow"><span class="lbl">俯角</span><span class="seg"><button id="pitch_20">20°</button><button id="pitch_25">25°</button><button id="pitch_30">30°</button></span></div>
     <div class="row volrow"><span class="lbl">無線電音量</span><input type="range" id="vol" min="0" max="100" value="60" aria-label="無線電音量"><span id="volTxt">60%</span></div>
   <div class="row morerow mobonly" id="moreRow"></div>
   </div>
@@ -266,6 +269,8 @@ button:focus-visible,input:focus-visible+span{outline:2px solid var(--accent);ou
       <p>沒有地圖、沒有箭頭，<br>聽無線電，往訊號強的地方找。</p>
       <p>接上車之後開穩一點，<br>平安送回有燈柱的小鎮。</p>
     </div>
+    <div class="seedrow"><label for="seedIn">地圖種子</label><input id="seedIn" inputmode="numeric" maxlength="6" placeholder="留空＝隨機" autocomplete="off"></div>
+    <p class="dim seedfrom" id="seedFrom" hidden></p>
     <button class="go" id="goBtn">開始</button>
   </div>
 </div>
@@ -1584,10 +1589,9 @@ var MK=MOBILE.matches?1.5:1,CAMOFF=MOBILE.matches?1.6*MK:0;   // 手機鏡頭拉
 var camHd=0,camLift=0,scoutK=0,scoutT=0;
 var CAM_FOLLOW=0.9,camFixed=false,camFixedHd=0;   // CAM_FOLLOW：鏡頭跟車頭的速度（原本 2.6，太快會暈）
 try{camFixed=localStorage.getItem('camFixed')==='1';}catch(e){}
-// 鏡頭俯角（Lu 2026-10-14 定 25°）：選單可切 20°／25°／30°；原本 40° 時畫面上緣只看到前方約 60 m，煙和手電筒常在畫面外（10°、40° 試過拿掉）。
+// 鏡頭俯角：開發版選單可切 20°／25°／30°；朋友版固定 30°、沒有選項（Lu 2026-10-14）。原本 40° 時畫面上緣只看到前方約 60 m，煙和手電筒常在畫面外（10°、40° 試過拿掉）。
 // 鏡頭到看的那點距離不變（約 40 m），車在畫面上差不多大；勘查時照舊升到約 61°，跟開車視角有明顯差別
-var CAM_PITCHES=[20,25,30],CAM_DIST=Math.hypot(26,31),camPitch=25;
-try{var cp_=+localStorage.getItem('camPitch');if(CAM_PITCHES.indexOf(cp_)>=0)camPitch=cp_;}catch(e){}
+var CAM_DIST=Math.hypot(26,31),camPitch=30;
 var playing=false,camA=Math.PI/4,camD=27*MK,camT=new THREE.Vector3(),flareT=0;
 function placeCar(){
   var c=tileCenter(2,2),t=tileCenter(W.target.i,W.target.j);
@@ -1627,8 +1631,8 @@ function routeRatio(w){   // 最短可走路線長度（8 方向、不切角、�
   }
   var st=Math.hypot(w.target.i-2,w.target.j-2);return cost[goal]<1e8?cost[goal]/st:99;
 }
-function newMission(forceSeed){   // forceSeed：指定種子重開同一張圖（除錯用）
-  var seed0=forceSeed!==undefined?forceSeed:(Math.random()*1e9)|0,tryN=0,scen=SCENARIOS[scenarioNo%SCENARIOS.length];scenarioNo++;   // 這趟的求救描述和地標，輪流用
+function newMission(forceSeed,baseSeed){   // forceSeed：指定種子重開同一張圖（除錯用）；baseSeed：從這個種子開始照常篩圖（朋友版：同一個地圖種子每次篩出同一張）
+  var seed0=forceSeed!==undefined?forceSeed:baseSeed!==undefined?baseSeed:(Math.random()*1e9)|0,tryN=0,scen=SCENARIOS[scenarioNo%SCENARIOS.length];scenarioNo++;   // 這趟的求救描述和地標，輪流用
   // 大地圖：先確認「主要路線入門車開得過去」。格子 BFS 走得到之後，再讓除錯機器人實際用物理開一次（限 450 模擬秒），
   // 開不到的圖就換一張（最多 12 次）。這一步只在換任務時跑，不影響遊戲中的流暢度
   for(;tryN<40;tryN++){
@@ -1643,7 +1647,8 @@ function newMission(forceSeed){   // forceSeed：指定種子重開同一張圖�
     }
     break;
   }
-  W.reachTries=tryN;W.scenario=scen;$('resSeed').textContent='種子 '+W.seed+'・'+({valley:'河谷',cliff:'懸崖路',hills:'丘陵'}[MT]||MT);mode=null;   // 篩圖機器人會自動選模式，開始前清掉
+  if(FRIEND.on&&!FRIEND.done&&FRIEND.seed!==null)scen=SCENARIOS[(W.seed>>>0)%SCENARIOS.length];   // 朋友版：求救描述和地標也跟著種子，朋友拿到的才一模一樣（拖車重來也同一套）
+  W.reachTries=tryN;W.scenario=scen;$('resSeed').textContent=(FRIEND.on&&!FRIEND.done&&FRIEND.seed!==null?'地圖種子 '+FRIEND.seed+'・第 '+(FRIEND.runs.length+1)+' 關 ':'種子 '+W.seed+'・')+({valley:'河谷',cliff:'懸崖路',hills:'丘陵'}[MT]||MT);mode=null;   // 篩圖機器人會自動選模式，開始前清掉
   buildWorld();placeCar();radioReset();car.v=0;car.pitch=car.roll=0;toastT=0;
   car.aboard=false;car.comfort=100;car.safeHist=[];releaseWinch();setScout(false);
   startMin=clockMin=DAY.starts[game.slot];hitAcc=0;   // 篩圖機器人跑過會讓時鐘前進，這裡重設
@@ -1713,7 +1718,7 @@ function showTown(){
   $('town').hidden=false;
 }
 function startTrip(){
-  $('town').hidden=true;MT=selType;game.trips++;if(FRIEND.on&&FRIEND.retry!==null){newMission(FRIEND.retry);FRIEND.retry=null;}else newMission();trip={winch:false,winchN:0,startHealth:game.health};
+  $('town').hidden=true;MT=selType;game.trips++;if(FRIEND.on&&FRIEND.retry!==null){newMission(FRIEND.retry);FRIEND.retry=null;}else newMission(undefined,friendBase());trip={winch:false,winchN:0,startHealth:game.health};
   playing=true;if(!audio)startAudio();
 }
 function repairCar(){var c=repairCost();if(!c)return;game.health=100;advanceSlots(c);showTown();}
@@ -1839,7 +1844,6 @@ $('mission').parentNode.addEventListener('click',function(e){if(!MOBILE.matches|
 // ---------- 手機版面：車庫抽屜、難度選單 ----------
 $('menuBtn').onclick=function(){$('menuWrap').classList.toggle('open');};
 $('vol').oninput=function(){radioVol=this.value/100;$('volTxt').textContent=this.value+'%';if(audio&&audio.rg)audio.rg.gain.value=radioVol;};
-['easy','normal','hard'].forEach(function(n){$('diff_'+n).addEventListener('click',function(){$('menuWrap').classList.remove('open');});});
 // ---------- audio ----------
 var audio=null,radioVol=0.6;   // 無線電音量 0～1，預設 60%
 function startAudio(){
@@ -1856,8 +1860,9 @@ function startAudio(){
     audio.nf=nf;audio.ng=ng;audio.rg=rg;audio.nbuf=buf;}catch(e){audio=null;}
 }
 
-['easy','normal','hard'].forEach(function(n){$('diff_'+n).onclick=function(){this.blur();if(n===diffName)return;setDifficulty(n);newMission();say('難度：'+DIFFS[n].label+'（重新出任務）',2000);};});
-$('goBtn').onclick=function(){$('intro').hidden=true;if(!audio)startAudio();if(FRIEND.on)showBrief(MT_ORDER[0]);else showTown();};
+// 朋友版沒有難度選擇（Lu 2026-10-14）：固定「普通」，大家同一個難度、分數才比得起來
+$('goBtn').onclick=function(){if(FRIEND.on){FRIEND.seed=parseSeed($('seedIn').value);if(FRIEND.seed===null)FRIEND.seed=100000+((Math.random()*900000)|0);}   // 朋友版：沒填就隨機給一個 6 位數
+  $('intro').hidden=true;if(!audio)startAudio();if(FRIEND.on)showBrief(MT_ORDER[0]);else showTown();};
 $('departBtn').onclick=function(){var b=BRIEF[selType];$('briefTitle').textContent=b[0];$('briefText').textContent='「'+b[1]+'」';$('town').hidden=true;$('brief').hidden=false;};   // 先看這關的提醒
 $('briefGo').onclick=function(){$('brief').hidden=true;startTrip();};
 $('repairBtn').onclick=repairCar;
@@ -1868,7 +1873,18 @@ $('nextBtn').onclick=function(){$('result').hidden=true;
   else if(FRIEND.on&&!FRIEND.done){FRIEND.done=true;showFinal();}
   else showTown();};
 // ----- 朋友版：按順序玩三關（河谷 → 懸崖路 → 丘陵），玩完給總成績、分享、繼續或重新開始 -----
-var FRIEND={on:true,runs:[],done:false,retry:null};
+var FRIEND={on:true,runs:[],done:false,retry:null,seed:null};
+// 地圖種子：一個 6 位數管三關（每關從它推出自己的起始種子，再照常篩圖）。難度固定普通，所以連結只帶 seed
+var SHARE_URL='https://luchuyong17.github.io/rescue-run/';   // 分享文字裡的連結（只是文字，不會連線）
+function parseSeed(v){v=String(v||'').replace(/\D/g,'').slice(0,6);return v?parseInt(v,10):null;}
+function levelSeed(k){return (Math.imul(FRIEND.seed+1,2654435761)^Math.imul(k+1,40503))>>>2;}   // 第 k 關（0 起）的起始種子
+function friendBase(){return FRIEND.on&&!FRIEND.done&&FRIEND.seed!==null?levelSeed(FRIEND.runs.length):undefined;}
+$('seedIn').addEventListener('keydown',function(e){e.stopPropagation();if(e.key==='Enter')$('goBtn').click();});   // 打字不要被遊戲的快捷鍵吃掉
+$('seedIn').addEventListener('input',function(){var v=this.value.replace(/\D/g,'').slice(0,6);if(v!==this.value)this.value=v;});
+(function(){   // 朋友分享的連結：?seed=482913 → 先填好種子
+  var q;try{q=new URLSearchParams(location.search);}catch(e){return;}
+  var s=parseSeed(q.get('seed'));if(s===null)return;
+  $('seedIn').value=s;$('seedFrom').textContent='朋友分享的地圖：直接開始就是同一組三關。';$('seedFrom').hidden=false;})();
 function showBrief(t){selType=t;var b=BRIEF[t],fr=FRIEND.on&&!FRIEND.done;$('briefTitle').textContent=(fr?'第 '+(FRIEND.runs.length+1)+' 關・':'')+b[0];$('briefText').textContent='「'+b[1]+(fr&&t==='cliff'?'絞盤也許可以幫上你的忙。':'')+'」';$('town').hidden=true;$('brief').hidden=false;}
 function friendRecord(title,sum){if(!FRIEND.on||FRIEND.done)return;FRIEND.runs.push({t:MT,title:title,sum:sum});FRIEND.days=game.day;
   $('nextBtn').textContent=FRIEND.runs.length<3?'下一關':'看總成績';}
@@ -1876,7 +1892,8 @@ function showFinal(){
   var tot=0,lines=FRIEND.runs.map(function(r,i){tot+=r.sum;return '第 '+(i+1)+' 關 '+MT_NAME[r.t]+'　'+r.title+'　'+r.sum+' 分';});
   $('finalSub').textContent='花了 '+FRIEND.days+' 天拯救了小鎮';
   $('finalList').innerHTML=FRIEND.runs.map(function(r,i){return '<li><span>第 '+(i+1)+' 關・'+MT_NAME[r.t]+'　'+r.title+'</span><b>'+r.sum+'</b></li>';}).join('')+'<li class="total"><span>總分</span><b>'+tot+'</b></li>';
-  FRIEND.text='救援行動｜花了 '+FRIEND.days+' 天拯救了小鎮，總分 '+tot+'\n'+lines.join('\n');
+  FRIEND.text='救援行動｜花了 '+FRIEND.days+' 天拯救了小鎮，總分 '+tot+'\n'+lines.join('\n')+
+    '\n\n用同一組地圖挑戰看看（種子 '+FRIEND.seed+'）：\n'+SHARE_URL+'?seed='+FRIEND.seed;
   $('shareTxt').textContent=FRIEND.text;$('nextBtn').textContent='回小鎮';
   $('final').hidden=false;
 }
@@ -1887,7 +1904,8 @@ $('shareBtn').onclick=function(){var t=FRIEND.text;
 $('contBtn').onclick=function(){$('final').hidden=true;showTown();};
 $('restartBtn').onclick=function(){$('final').hidden=true;
   game.day=1;game.slot=0;game.health=100;game.rescued=0;game.score=0;game.trips=0;rescued=0;updateHouses();
-  FRIEND.runs=[];FRIEND.done=false;FRIEND.retry=null;$('nextBtn').textContent='下一關';showBrief(MT_ORDER[0]);};
+  FRIEND.runs=[];FRIEND.done=false;FRIEND.retry=null;$('nextBtn').textContent='下一關';
+  $('seedIn').value=FRIEND.seed;$('seedFrom').textContent='填的是剛才那組地圖；清掉就換新的。';$('seedFrom').hidden=false;$('intro').hidden=false;};   // 回開場卡片：同一組再挑戰，或清掉換新地圖
 
 // ---------- physics ----------
 var blockMsgT=0,spinT=0,modeHintT=0,tiltHintT=0,tipT2=0,safeT=0,histT=0,rollWarnT=0;
@@ -2356,10 +2374,6 @@ function setCamMode(fixed){camFixed=fixed;camFixedHd=camHd;try{localStorage.setI
 document.getElementById('cam_follow').onclick=function(){this.blur();setCamMode(false);};
 document.getElementById('cam_fixed').onclick=function(){this.blur();setCamMode(true);};
 setCamMode(camFixed);
-function setCamPitch(p){camPitch=p;try{localStorage.setItem('camPitch',String(p));}catch(e){}
-  CAM_PITCHES.forEach(function(v){document.getElementById('pitch_'+v).classList.toggle('on',v===p);});}
-CAM_PITCHES.forEach(function(v){document.getElementById('pitch_'+v).onclick=function(){this.blur();setCamPitch(v);};});
-setCamPitch(camPitch);
 function drawCompass(){
   var dpr=2,cw=compassCv.clientWidth||520,ch=compassCv.clientHeight||48;
   if(compassCv.width!==cw*dpr||compassCv.height!==ch*dpr){compassCv.width=cw*dpr;compassCv.height=ch*dpr;}

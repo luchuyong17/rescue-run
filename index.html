@@ -79,6 +79,8 @@ button:focus-visible,input:focus-visible+span{outline:2px solid var(--accent);ou
 .seg{display:flex;gap:4px;flex:1;}
 .seg button{flex:1;padding:3px 0;font-size:12px;background:rgba(243,233,216,.06);border:1px solid rgba(243,233,216,.14);border-radius:6px;cursor:pointer;}
 .seg button.on{background:rgba(232,176,74,.22);border-color:var(--accent);color:var(--accent);}
+.mapcard{max-width:440px;}
+.mapcv{display:block;width:100%;aspect-ratio:1;border-radius:10px;background:#57514f;margin:6px 0 10px;}
 .compass{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 12px);transform:translateX(-50%);z-index:6;width:min(520px,calc(100vw - 660px));height:48px;pointer-events:none;}
 @media (max-width:1180px){.compass{width:min(520px,calc(100vw - 24px));top:calc(env(safe-area-inset-top,0px) + 196px);}}
 .tog .chip{display:block;width:12px;height:12px;border-radius:50%;flex:none;border:1px solid rgba(255,255,255,.45);}
@@ -207,7 +209,9 @@ button:focus-visible,input:focus-visible+span{outline:2px solid var(--accent);ou
   .hud-right .mode kbd{display:none;}
   #tScout{left:-146px;top:-76px;}   /* 和絞盤左右對稱：放在低速檔和洩氣上方 */
   #tScout em{display:none;}
-  #tTow{position:fixed;top:calc(env(safe-area-inset-top,0px) + 76px);right:8px;left:auto;width:64px;height:40px;border-radius:12px;margin:0;z-index:8;}   /* 圓角方形，和頂部那排一致 */   /* 右上方，離勘查、選單鈕 ≥28 px、離下方的模式鍵很遠，避免誤觸 */
+  #tTow{position:fixed;top:calc(env(safe-area-inset-top,0px) + 76px);right:8px;left:auto;width:64px;height:40px;border-radius:12px;margin:0;z-index:8;}
+  #tMap{position:fixed;top:calc(env(safe-area-inset-top,0px) + 138px);right:8px;left:auto;width:64px;height:40px;border-radius:12px;margin:0;z-index:8;}   /* 地圖鈕：拖車鈕下面，同樣的圓角方形 */   /* 圓角方形，和頂部那排一致 */   /* 右上方，離勘查、選單鈕 ≥28 px、離下方的模式鍵很遠，避免誤觸 */
+  #tTow,#tMap{flex-direction:row;gap:5px;}   /* 右上的方形鈕：小點放在文字左邊（上下疊會擠出按鈕外） */
   #tWinch{left:100px;top:-76px;}   /* 第五顆圓鈕：放在差速鎖和升高上方，樣式和模式鍵一樣 */
 }
 #tTow{margin-top:14px;}   /* 電腦版：和上面的鍵隔開一點，避免誤觸 */
@@ -226,6 +230,7 @@ button:focus-visible,input:focus-visible+span{outline:2px solid var(--accent);ou
   <button class="mobonly" id="menuBtn" aria-label="選單">⋯</button>
   <div class="menuwrap" id="menuWrap">
   <div class="row diffrow" id="diffRow"><span class="lbl">難度</span><span class="seg"><button id="diff_easy">簡單</button><button id="diff_normal">普通</button><button id="diff_hard">困難</button></span></div>
+    <div class="row camrow"><span class="lbl">鏡頭</span><span class="seg"><button id="cam_follow">跟著轉</button><button id="cam_fixed">固定方向</button></span></div>
     <div class="row volrow"><span class="lbl">無線電音量</span><input type="range" id="vol" min="0" max="100" value="60" aria-label="無線電音量"><span id="volTxt">60%</span></div>
   <div class="row morerow mobonly" id="moreRow"></div>
   </div>
@@ -239,6 +244,7 @@ button:focus-visible,input:focus-visible+span{outline:2px solid var(--accent);ou
   <button class="tog mode" id="tRiver" data-m="river"><i class="chip" style="background:#3f8f9c"></i><span>升高</span><kbd>4</kbd></button>
   <button class="tog mode" id="tScout"><i class="chip" style="background:#9cc46f"></i><span>勘查</span><em></em><kbd>F</kbd></button>
   <button class="tog mode" id="tWinch"><i class="chip" style="background:#e8b04a"></i><span>絞盤</span><kbd>R</kbd></button>
+  <button class="tog mode" id="tMap" hidden><i class="chip" style="background:#9cc46f"></i><span>地圖</span><kbd>M</kbd></button>
   <button class="tog mode" id="tTow" hidden><i class="chip" style="background:#9aa1ab"></i><span>拖車</span><kbd>T</kbd></button>
 </div>
 
@@ -284,6 +290,15 @@ button:focus-visible,input:focus-visible+span{outline:2px solid var(--accent);ou
     <h1 id="briefTitle"></h1>
     <div class="introtxt"><p id="briefText"></p></div>
     <button class="go" id="briefGo">上路</button>
+  </div>
+</div>
+
+<div class="overlay" id="mapView" hidden>   <!-- 地圖卡片：沒去過的地方是黑的，開過的路兩側 5 m 亮起來 -->
+  <div class="card mapcard">
+    <h2>地圖</h2>
+    <canvas class="mapcv" id="mapCv" width="800" height="800" aria-label="地圖：去過的地方"></canvas>
+    <p class="dim">灰色是還沒去過的地方。綠點是小鎮，箭頭是車。</p>
+    <button class="go" id="mapClose">回到車上</button>
   </div>
 </div>
 
@@ -976,11 +991,11 @@ var RADIO_BASE=Object.assign({},RADIO);   // 預設值：切換難度時先還�
 // 與無線電參數（會覆蓋上面的 RADIO）。簡單版≈第一版 400 m；普通＝目標 3～5 分鐘。
 var DIFFS={   // 每個難度另有 trackLen（舊車痕長度，公尺，以 400 m 地圖計）、trackGap（車痕空白的倍率）
   easy:{label:'簡單',relief:1,ridges:0,ridgeH:0,ridgeW:34,rivers:1,basin:false,creeks:0,fordGap:42,creekDip:10,rocks:0,logs:0,nearDecoys:0,partialDecoys:false,roadFrac:0.4,trackLen:90,trackGap:0.7,
-    radio:{range:MAP_M*0.30,clarBase:0.3,clarHeight:0.5,clarAnt:0.2,antennaPow:3.5,antennaMin:0.15,ridgeLoss:0.8,ridgeFull:1.0,fadeAmp:0,barSmooth:5}},
+    radio:{range:MAP_M*0.70,smokeRatio:0.64,clarBase:0.3,clarHeight:0.5,clarAnt:0.2,antennaPow:3.5,antennaMin:0.15,ridgeLoss:0.8,ridgeFull:1.0,fadeAmp:0,barSmooth:5}},
   normal:{label:'普通',relief:1.2,ridges:1,ridgeH:4.2,ridgeW:48,rivers:2,basin:true,creeks:1,fordGap:42,creekDip:10,rocks:0.007,logs:0.006,nearDecoys:2,partialDecoys:true,roadFrac:0.3,trackLen:100,trackGap:1,
-    radio:{range:MAP_M*0.22,clarBase:0.2,clarHeight:0.55,clarAnt:0.25,antennaPow:4.5,antennaMin:0.1,ridgeLoss:0.9,ridgeFull:0.6,fadeAmp:0.45,barSmooth:3}},
+    radio:{range:MAP_M*0.60,smokeRatio:0.55,clarBase:0.2,clarHeight:0.55,clarAnt:0.25,antennaPow:4.5,antennaMin:0.1,ridgeLoss:0.9,ridgeFull:0.6,fadeAmp:0.45,barSmooth:3}},
   hard:{label:'困難',relief:1.25,ridges:1,ridgeH:4.6,ridgeW:50,rivers:2,basin:true,creeks:2,fordGap:42,creekDip:11,rocks:0.010,logs:0.007,nearDecoys:3,partialDecoys:true,roadFrac:0.2,trackLen:75,trackGap:1.6,
-    radio:{range:MAP_M*0.19,clarBase:0.12,clarHeight:0.6,clarAnt:0.28,antennaPow:5.2,antennaMin:0.07,ridgeLoss:0.93,ridgeFull:0.55,fadeAmp:0.55,barSmooth:2.8,faintAmp:0.16,smokeAlpha:0.32,smokeDuty:0.6}}
+    radio:{range:MAP_M*0.50,smokeRatio:0.57,clarBase:0.12,clarHeight:0.6,clarAnt:0.28,antennaPow:5.2,antennaMin:0.07,ridgeLoss:0.93,ridgeFull:0.55,fadeAmp:0.55,barSmooth:2.8,faintAmp:0.16,smokeAlpha:0.32,smokeDuty:0.6}}
 };
 var diffName='normal';
 function setDifficulty(name){diffName=name;DP=DIFFS[name];Object.assign(RADIO,RADIO_BASE,DP.radio);ROAD_FRAC=BIG?DP.roadFrac:1;
@@ -1559,6 +1574,8 @@ function setTog(id,on,txt){var el=$(id);el.classList.toggle('on',!!on);var em=el
 // ---------- mission ----------
 var MK=MOBILE.matches?1.5:1,CAMOFF=MOBILE.matches?1.6*MK:0;   // 手機鏡頭拉遠倍率（車太大、看到的路面太少）
 var camHd=0,camLift=0,scoutK=0,scoutT=0;
+var CAM_FOLLOW=0.9,camFixed=false,camFixedHd=0;   // CAM_FOLLOW：鏡頭跟車頭的速度（原本 2.6，太快會暈）
+try{camFixed=localStorage.getItem('camFixed')==='1';}catch(e){}
 var playing=false,camA=Math.PI/4,camD=27*MK,camT=new THREE.Vector3(),flareT=0;
 function placeCar(){
   var c=tileCenter(2,2),t=tileCenter(W.target.i,W.target.j);
@@ -1620,7 +1637,7 @@ function newMission(forceSeed){   // forceSeed：指定種子重開同一張圖�
   startMin=clockMin=DAY.starts[game.slot];hitAcc=0;   // 篩圖機器人跑過會讓時鐘前進，這裡重設
   targetObj.visible=true;
   $('mission').textContent=MT==='cliff'?'沿著懸崖窄路找到傷者（小心落石、別讓輪子出路緣）':MT==='hills'?'在丘陵之間找出能走的路，找到傷者':'聽無線電，找到發出求救訊號的登山客';$('passRow').hidden=true;$('radioRow').hidden=false;$('radioSub').style.opacity=MOBILE.matches?0:1;showMission();
-  camT.set(car.x,0,car.z);camHd=car.th;camLift=0;rocksReset();car.cpIdx=0;car.fallT=0;car.hist=[];car.flip=false;car.rewindAsk=false;$('rewind').hidden=true;
+  camT.set(car.x,0,car.z);camHd=car.th;camFixedHd=car.th;car.trail=[];fogReset();camLift=0;rocksReset();car.cpIdx=0;car.fallT=0;car.hist=[];car.flip=false;car.rewindAsk=false;$('rewind').hidden=true;
 }
 // ----- 結算：分數明細（數字都在這裡）-----
 var SCORE={rescue:100,comfortK:0.6,perfect:20,hourPenalty:2,hourPenaltyMax:30,damageK:0.5,winch:5};   // winch：每勾一次扣幾分（沒有上限）
@@ -1743,7 +1760,7 @@ addEventListener('keydown',function(e){
   if(KM[e.code]){keys[KM[e.code]]=true;e.preventDefault();return;}
   if(!playing||e.repeat)return;
   if(e.code==='KeyQ'||e.code==='Digit1')setMode('rock');else if(e.code==='Digit2')setMode('sand');else if(e.code==='KeyE'||e.code==='Digit3')setMode('mud');else if(e.code==='Digit4')setMode('river');else if(e.code==='KeyR')winchStart();
-  else if(e.code==='KeyF')setScout(!scouting);else if(e.code==='KeyT')tow();
+  else if(e.code==='KeyF')setScout(!scouting);else if(e.code==='KeyT')tow();else if(e.code==='KeyM'){if(mapOpen)closeMap();else openMap();}
 });
 addEventListener('keyup',function(e){if(KM[e.code])keys[KM[e.code]]=false;if(e.code==='KeyR')winchStop();});
 addEventListener('blur',function(){for(var k in keys)keys[k]=false;winchStop();});
@@ -1755,7 +1772,7 @@ addEventListener('blur',function(){for(var k in keys)keys[k]=false;winchStop();}
   ['pointerup','pointercancel','lostpointercapture'].forEach(function(n){wb.addEventListener(n,function(){winchDrag=null;if(chip)chip.style.transform='';winchStop();});});
 })();
 $('tScout').onclick=function(){setScout(!scouting);};
-$('tTow').onclick=tow;
+$('tTow').onclick=tow;$('tMap').onclick=function(){this.blur();openMap();};$('mapClose').onclick=closeMap;
 document.querySelectorAll('.tpad button').forEach(function(b){
   var k=b.getAttribute('data-k');
   b.addEventListener('pointerdown',function(e){keys[k]=true;b.classList.add('held');b.setPointerCapture(e.pointerId);e.preventDefault();});
@@ -2188,7 +2205,7 @@ function physics(dt){
 var DIFFS_GATE=false,quiet=false;   // DIFFS_GATE：出圖時讓機器人試開（Lu 2026-10-13：三種任務都不試開，格子檢查過就出圖）；quiet：快轉模擬時不出聲
 var simT=0;   // 模擬時間（秒），訊號起伏用它，除錯時可以快轉
 var RS={sq:false,ng:0,smoke:false,dist:0,angCos:1,antenna:1,ridge:0,high:0,sig:0,clar:0,shown:0},radioT=0;
-function radioReset(){RS.shown=0;radioT=1.5+Math.random()*2;talking=false;RS.sq=false;RS.ng=0;$('radioLine').textContent='';}
+function radioReset(){RS.hearD=null;RS.shown=0;radioT=1.5+Math.random()*2;talking=false;RS.sq=false;RS.ng=0;$('radioLine').textContent='';}
 // 山稜：沿車→目標連線取樣，地形高過連線就算擋住，回傳 0（沒擋）～1（完全擋住）
 function ridgeBlock(tp,d,extra){
   var h0=groundH(car.x,car.z)+RADIO.eyeH,h1=tp.y+RADIO.eyeH+(extra||0),worst=0,n=clamp(Math.ceil(d/RADIO.ridgeStep),8,60);
@@ -2236,10 +2253,24 @@ function voiceBlips(kept){
   });
 }
 // 每次發話：按清晰度隨機把詞換成「⋯」，每次掉的詞都不同。靜噪沒打開就不發聲、不出字幕
+// 傷者「聽到你」（朋友回饋：大家看字幕、不太看訊號格）：車在 HEAR.range 公尺內，傷者照距離變化喊話——
+// 第一次聽到引擎聲、變近、變遠、很近；距離沒什麼變就講原本的地標描述。喊話比較大聲，清晰度至少 HEAR.clarMin
+var HEAR={range:150,delta:8,near:40,clarMin:0.85};
+var HEAR_LINES={first:['⋯咦？','好像','聽到','引擎聲了！'],closer:['聲音','變大了！','你往','這邊來','對了！'],
+  farther:['聲音','變小了⋯','你是不是','走遠了？'],near:['很近了！','就在','附近！','我在這裡！']};
 function radioSpeak(){
-  var line=W.scenario.line,kept=[],txt='—';
+  var line=W.scenario.line,kept=[],txt='—',clar=RS.clar;
+  if(RS.sq&&RS.dist<HEAR.range){
+    var hl=null;
+    if(RS.dist<HEAR.near)hl=HEAR_LINES.near;
+    else if(RS.hearD==null)hl=HEAR_LINES.first;
+    else if(RS.dist<RS.hearD-HEAR.delta)hl=HEAR_LINES.closer;
+    else if(RS.dist>RS.hearD+HEAR.delta)hl=HEAR_LINES.farther;
+    RS.hearD=RS.dist;
+    if(hl){line=hl;clar=Math.max(clar,HEAR.clarMin);}
+  }else if(RS.dist>=HEAR.range)RS.hearD=null;   // 走出範圍：下次回來重新「聽到」
   if(RS.sq){
-    kept=line.map(function(){return RS.clar>=0.98||Math.random()<RS.clar;});
+    kept=line.map(function(){return clar>=0.98||Math.random()<clar;});
     txt=line.map(function(w,n){return kept[n]?w:'⋯';}).join('');
   }
   $('radioLine').textContent=txt;voiceBlips(kept);
@@ -2272,6 +2303,40 @@ function radioUpdate(dt){
 
 // ---------- 方位帶：隨車頭轉的刻度帶（可視 180°），回家的方向用琥珀色標示；不是地圖也不是雷達 ----------
 var compassCv=$('compass'),cx2=compassCv.getContext('2d');
+// 地圖（Lu 2026-10-13）：按「地圖」打開卡片，整張圖北朝上；沒去過的地方是黑的，開過的路兩側 FOG_R 公尺算去過。
+// 不標傷者（不做雷達地圖）。打開時遊戲暫停
+var FOG_R=15,MAP_PX=2,mapOpen=false;   // MAP_PX：每公尺幾個像素（地圖 400 m → 800 px）
+var fogCv=document.createElement('canvas'),fogX=fogCv.getContext('2d'),terrCv=document.createElement('canvas'),terrW=null;
+function mapXY(x,z){return [(x+HALF)*MAP_PX,(HALF-z)*MAP_PX];}   // 北（+z）朝上
+function fogReset(){fogCv.width=fogCv.height=MAP_M*MAP_PX;fogX.fillStyle='#57514f';fogX.fillRect(0,0,fogCv.width,fogCv.height);}
+function fogReveal(x,z){var p=mapXY(x,z);fogX.globalCompositeOperation='destination-out';fogX.beginPath();fogX.arc(p[0],p[1],FOG_R*MAP_PX,0,6.2832);fogX.fill();fogX.globalCompositeOperation='source-over';}
+function buildTerrainMap(){   // 每格塗地表顏色，西北方打光看得出高低；樹和大石頭畫成點
+  var px=MAP_M*MAP_PX,t=TILE*MAP_PX,c=terrCv.getContext('2d');terrCv.width=terrCv.height=px;var col=new THREE.Color();
+  for(var i=0;i<N;i++)for(var j=0;j<N;j++){var id=idx(i,j),k=clamp(1+(tH(i,j)-tH(i-1,j+1))*0.35,0.6,1.35);
+    col.set(SURF[W.surf[id]].color);c.fillStyle='rgb('+Math.round(clamp(col.r*k,0,1)*255)+','+Math.round(clamp(col.g*k,0,1)*255)+','+Math.round(clamp(col.b*k,0,1)*255)+')';
+    var p=mapXY(i*TILE-HALF,(j+1)*TILE-HALF);c.fillRect(p[0],p[1],t+0.5,t+0.5);}
+  c.fillStyle='#2f4a26';W.trees.forEach(function(tr){var p=mapXY(tr.x,tr.z);c.beginPath();c.arc(p[0],p[1],1.6*MAP_PX,0,6.2832);c.fill();});
+  c.fillStyle='#6d6f78';W.rocks.forEach(function(r){var p=mapXY(r.x,r.z);c.beginPath();c.arc(p[0],p[1],Math.max(1.2,(r.cr||1))*MAP_PX,0,6.2832);c.fill();});
+  terrW=W;
+}
+function drawMap(){
+  if(terrW!==W)buildTerrainMap();
+  var cv=$('mapCv'),c=cv.getContext('2d'),px=cv.width,k=px/(MAP_M*MAP_PX);
+  c.setTransform(k,0,0,k,0,0);c.drawImage(terrCv,0,0);c.drawImage(fogCv,0,0);
+  var tr=car.trail||[];if(tr.length>1){c.beginPath();tr.forEach(function(q,i){var p=mapXY(q[0],q[1]);if(i)c.lineTo(p[0],p[1]);else c.moveTo(p[0],p[1]);});
+    c.strokeStyle='rgba(232,176,74,.55)';c.lineWidth=0.8*MAP_PX;c.lineJoin=c.lineCap='round';c.stroke();}
+  var hp=tileCenter(1.5,1.5),h=mapXY(hp[0],hp[1]);c.fillStyle='#9cc46f';c.strokeStyle='#1c161e';c.lineWidth=3;c.beginPath();c.arc(h[0],h[1],7*MAP_PX,0,6.2832);c.fill();c.stroke();
+  var cp=mapXY(car.x,car.z);c.save();c.translate(cp[0],cp[1]);c.rotate(car.th);c.fillStyle='#f3e9d8';c.strokeStyle='#1c161e';c.lineWidth=3;
+  c.beginPath();c.moveTo(0,-9*MAP_PX);c.lineTo(6*MAP_PX,7*MAP_PX);c.lineTo(-6*MAP_PX,7*MAP_PX);c.closePath();c.fill();c.stroke();c.restore();   // 車：箭頭＝車頭
+  c.setTransform(1,0,0,1,0,0);c.fillStyle='#f3e9d8';c.font='700 34px "Noto Sans TC",sans-serif';c.textAlign='center';c.textBaseline='top';c.fillText('北',px/2,12);
+}
+function openMap(){if(!playing||mapOpen)return;mapOpen=true;keys.gas=keys.brake=keys.left=keys.right=false;stick.on=false;drawMap();$('mapView').hidden=false;}
+function closeMap(){mapOpen=false;$('mapView').hidden=true;}
+function setCamMode(fixed){camFixed=fixed;camFixedHd=camHd;try{localStorage.setItem('camFixed',fixed?'1':'0');}catch(e){}
+  document.getElementById('cam_follow').classList.toggle('on',!fixed);document.getElementById('cam_fixed').classList.toggle('on',fixed);}
+document.getElementById('cam_follow').onclick=function(){this.blur();setCamMode(false);};
+document.getElementById('cam_fixed').onclick=function(){this.blur();setCamMode(true);};
+setCamMode(camFixed);
 function drawCompass(){
   var dpr=2,cw=compassCv.clientWidth||520,ch=compassCv.clientHeight||48;
   if(compassCv.width!==cw*dpr||compassCv.height!==ch*dpr){compassCv.width=cw*dpr;compassCv.height=ch*dpr;}
@@ -2304,7 +2369,7 @@ function frame(){
   simT+=dt;
   var st=stats(),ph=null;
   if(audio)audio.g.gain.setTargetAtTime(playing&&car.fallT<=0?0.03:0,audio.A.currentTime,0.15);   // 引擎聲只在開車時有
-  if(playing){ph=physics(dt/2);ph=physics(dt/2);}
+  if(playing&&!mapOpen){ph=physics(dt/2);ph=physics(dt/2);}
   else{var w0=wheelWorld(car.x,car.z,car.th);ph={st:st,ws:w0,hs:w0.map(function(w){return groundH(w[0],w[1]);})};}
   // car visuals
   updateModeVisual(dt);
@@ -2334,7 +2399,10 @@ function frame(){
   // camera
   camT.x+=(car.x-camT.x)*Math.min(1,dt*4);camT.z+=(car.z-camT.z)*Math.min(1,dt*4);camT.y+=(car.bodyY-camT.y)*Math.min(1,dt*3);
   // 開車視角：鏡頭在車後上方、俯角約 40°，跟著車頭方向轉（慢慢跟，不暈）；勘查時才切到固定的斜俯視
-  var dH=car.th-camHd;while(dH>Math.PI)dH-=2*Math.PI;while(dH<-Math.PI)dH+=2*Math.PI;camHd+=dH*Math.min(1,dt*2.6);
+  // 鏡頭方向（朋友回饋：轉太快會暈）：跟著轉＝慢慢跟車頭（倒車時不轉）；固定方向＝畫面不轉，只跟著車移動
+  if(camFixed)camHd=camFixedHd;
+  else if(car.v>-0.3){var dH=car.th-camHd;while(dH>Math.PI)dH-=2*Math.PI;while(dH<-Math.PI)dH+=2*Math.PI;camHd+=dH*Math.min(1,dt*CAM_FOLLOW);}
+  if(playing){var tr=car.trail||(car.trail=[]),lt=tr[tr.length-1];if(!lt||Math.hypot(car.x-lt[0],car.z-lt[1])>2){tr.push([car.x,car.z]);fogReveal(car.x,car.z);}}   // 地圖：記開過的路（每 2 m 一點，半徑 5 m 算去過）
   // 開車視角：鏡頭在車後上方、俯角約 40°。勘查時鏡頭慢慢升高、看寬一點（不用停車）；關掉再慢慢回來
   scoutK+=((scouting?1:0)-scoutK)*Math.min(1,dt*1.6);
   if(towArm>0){towArm-=dt;if(towArm<=0)setTog('tTow',false,'');}
@@ -2356,7 +2424,7 @@ function frame(){
   if(hudT<=0&&W){hudT=0.1;
     var t=tileOf(car.x,car.z);if(t>=0)$('surfTxt').textContent=SURF[W.surf[t]].name;
     $('clock').textContent=fmtClock(clockMin);
-    $('tTow').hidden=!playing;   // 絞盤鍵一直顯示（跟其他按鈕一樣；沒在開車時按了沒反應）
+    $('tTow').hidden=!playing;$('tMap').hidden=!playing;   // 絞盤鍵一直顯示（跟其他按鈕一樣；沒在開車時按了沒反應）
     if(!car.aboard){var bars=RS.shown<RADIO.hudMin?0:clamp(Math.ceil(RS.shown*5),1,5);
       document.querySelectorAll('#bars i').forEach(function(el,n){el.classList.toggle('on',n<bars);});
       $('radioTxt').textContent=debugMarker?('距離 '+RS.dist.toFixed(0)+' m　訊號 '+RS.sig.toFixed(2)+'　清晰 '+RS.clar.toFixed(2)):(bars>=5?'很近了':'');}

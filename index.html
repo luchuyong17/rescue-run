@@ -336,11 +336,11 @@ var MAP_M=400;
 var BIG=MAP_M>100;                 // 大地圖才有的處理（地形加高、部分道路不畫、散落地標）
 var LS=BIG?4:1;                    // 高度層數倍率：大地圖每層只有 11 公分、共 0～24 層（最高約 5.4 公尺）。
                                    // 層數切細，坡才是緩坡不是階梯，開得動；山夠高，山稜才擋得住訊號
-var TILE=BIG?4:2, STEP=0.45/LS, N=Math.round(MAP_M/TILE), HALF=N*TILE/2, BEV=BIG?0.5:0.22;   // BEV 0.5＝整格圓滑過渡
+var TILE=BIG?4:2, STEP=0.45/LS, N=Math.round(MAP_M/TILE), HALF=N*TILE/2, BEV=BIG?0.5:0.22, BEV_SHARP=0.12;   // BEV 0.5＝整格圓滑過渡；BEV_SHARP＝爬不上去的坎只在格子交界附近過渡（看得出是陡坎）
 var HILL_RATIO=[1.2,2.0];   // 丘陵篩圖：最短路線是直線距離的幾倍（山矮了以後到處爬得上，不像以前要 1.5～2.0）
 var VAL_DIST=[200,300];   // 河谷：傷者離小鎮直線幾公尺（Lu 2026-10-13：原本 150～240 太近）
 var HILL_DIST=[200,350],HILL_EXTRA=10,HILL_WALLS=30;   // 丘陵：傷者離小鎮直線幾公尺（其他任務用 START_DIST）；主谷、死路谷以外，另外在整張圖散幾條谷、幾道牆（遠處也有地形）
-var HILL_K=0.5,HILL_PAT=16;   // 丘陵：山的高度倍數（原本 1）、地面起伏每格升降層數（0＝不起伏；16 層≈24°）
+var HILL_K=0.5,HILL_PAT=14;   // 丘陵：山的高度倍數（原本 1）、地面起伏每格升降層數（0＝不起伏；14 層≈21.5°，Lu 2026-10-14 從 16 層≈24° 調降）
 var MT='valley';                   // 任務類型：valley 河谷、cliff 懸崖路、hills 丘陵（小鎮畫面輪流出）
 var START_DIST=[0.375,0.6];        // 目標離小鎮的距離 ＝ MAP_M × 這個範圍（400 m 時是 150～240 m）
 var ROAD_FRAC=BIG?0.4:1;           // （難度會覆蓋，見 DIFFS.roadFrac）
@@ -436,7 +436,7 @@ function generate(seed){
     });});
     for(i=0;i<N;i++)for(j=0;j<N;j++){var cd=chD[idx(i,j)];if(cd>8)continue;var capH=Math.round(6+22*Math.max(0,cd-1.1));if(level[idx(i,j)]>capH)level[idx(i,j)]=capH;}   // 谷底 6 層，兩側谷壁每格升 22 層（紅，爬不上）
     for(i=0;i<=3;i++)for(j=0;j<=3;j++)level[idx(i,j)]=6;
-    // 地面起伏：整張圖沿 i 方向加三角波（週期 6 格、每格升降 HILL_PAT 層＝約 24°），谷底和平地也都是要小心的黃色斜坡，幾乎沒有綠色；
+    // 地面起伏：整張圖沿 i 方向加三角波（週期 6 格、每格升降 HILL_PAT 層＝約 21.5°），谷底和平地也都是要小心的黃色斜坡，幾乎沒有綠色；
     // 只在低處（谷底、平地）起伏、往上淡出（山的高度不被加高；山坡本身都 ≥15°），離小鎮 4 格內從平地慢慢淡入（出得了小鎮）
     var PATW=[0,1,2,3,2,1];
     for(i=0;i<N;i++)for(j=0;j<N;j++){
@@ -933,7 +933,12 @@ var W=null;
 function tH(i,j){i=clamp(i,0,N-1);j=clamp(j,0,N-1);var id=idx(i,j);return W.level[id]*STEP-W.depth[id];}
 function groundH(x,z){
   var u=(x+HALF)/TILE-0.5,v=(z+HALF)/TILE-0.5,i0=Math.floor(u),j0=Math.floor(v);
-  var su=ss(0.5-BEV,0.5+BEV,u-i0),sv=ss(0.5-BEV,0.5+BEV,v-j0);
+  // 爬不上去的坎畫成陡坎（試玩回饋：整格圓滑會把 0.9 m 的坎抹成看起來開得上去的緩坡，撞了才知道）；爬得上去的照舊圓滑
+  var lim=W.limUp||1e9,L=W.level,lv=function(i,j){return L[idx(clamp(i,0,N-1),clamp(j,0,N-1))];};
+  var du=Math.max(Math.abs(lv(i0+1,j0)-lv(i0,j0)),Math.abs(lv(i0+1,j0+1)-lv(i0,j0+1)));
+  var dv=Math.max(Math.abs(lv(i0,j0+1)-lv(i0,j0)),Math.abs(lv(i0+1,j0+1)-lv(i0+1,j0)));
+  var bu=du>lim?BEV_SHARP:BEV,bv=dv>lim?BEV_SHARP:BEV;
+  var su=ss(0.5-bu,0.5+bu,u-i0),sv=ss(0.5-bv,0.5+bv,v-j0);
   var a=tH(i0,j0),b=tH(i0+1,j0),c=tH(i0,j0+1),d=tH(i0+1,j0+1);
   var h=a+(b-a)*su+(c-a)*sv+(a-b-c+d)*su*sv;
   if(W.roadTile){var t=tileOf(x,z);if(t>=0&&W.roadTile[t]){var cc=tileCenter((t/N)|0,t%N);h-=W.tilt[t]*((x-cc[0])*W.cnx[t]+(z-cc[1])*W.cnz[t]);}}   // 外傾：靠懸崖那側比較低
@@ -1743,12 +1748,12 @@ function winchStart(){
   anchor=null;car.winch=true;car.winchA=true;car.winchT=0;setTog('tWinch',true,'');
   say('往一個方向指，選要勾的樹或石頭',2000);
 }
-function winchStop(){if(car.winch||car.winchPull)releaseWinch();}
+function winchStop(){if(car.winch||car.winchPull)releaseWinch();if(toastMsg==='往一個方向指，選要勾的樹或石頭')toastT=0;}   // 放開就收掉選方向的提示
 var towArm=0;
 function tow(){   // 按兩下確認（3 秒內再按一次），避免誤觸；確認後這趟算沒救到人
   if(!playing)return;
   if(towArm<=0){towArm=3;setTog('tTow',true,'');say('再按一次「拖車」確認（算沒救到人）',2600);return;}
-  towArm=0;setTog('tTow',false,'');finishFail();
+  towArm=0;setTog('tTow',false,'');toastT=0;finishFail();   // 確認了就把「再按一次」的提示收掉
 }
 
 // ---------- input ----------
@@ -2207,31 +2212,35 @@ var simT=0;   // 模擬時間（秒），訊號起伏用它，除錯時可以快
 var RS={sq:false,ng:0,smoke:false,dist:0,angCos:1,antenna:1,ridge:0,high:0,sig:0,clar:0,shown:0},radioT=0;
 function radioReset(){RS.hearD=null;RS.shown=0;radioT=1.5+Math.random()*2;talking=false;RS.sq=false;RS.ng=0;$('radioLine').textContent='';}
 // 山稜：沿車→目標連線取樣，地形高過連線就算擋住，回傳 0（沒擋）～1（完全擋住）
-function ridgeBlock(tp,d,extra){
+// 丘陵的無線電（Lu 2026-10-14）：丘陵每 24 m 就有一道約 5 m 的起伏，照一般的值幾乎處處被完全擋住（75% 的位置、訊號只剩 27%）。
+// 只在丘陵放寬：被擋 4 m 以上才算完全擋住、擋住時訊號扣五成、清晰度扣六成 → 約 23% 完全擋住、訊號剩 73%（河谷約 88%）。信號煙照舊（那是看得到看不到）
+var HILL_RADIO={ridgeFull:4,ridgeLoss:0.5,clarRidge:0.6};
+function radioRidge(){return MT==='hills'?HILL_RADIO:RADIO;}
+function ridgeBlock(tp,d,extra,full){
   var h0=groundH(car.x,car.z)+RADIO.eyeH,h1=tp.y+RADIO.eyeH+(extra||0),worst=0,n=clamp(Math.ceil(d/RADIO.ridgeStep),8,60);
   for(var k=1;k<n;k++){
     var u=k/n,x=car.x+(tp.x-car.x)*u,z=car.z+(tp.z-car.z)*u;
     var over=groundH(x,z)-(h0+(h1-h0)*u)-RADIO.ridgeClear;
     if(over>worst)worst=over;
   }
-  return clamp(worst/RADIO.ridgeFull,0,1);
+  return clamp(worst/(full||RADIO.ridgeFull),0,1);
 }
 function radioMeasure(){
   var tp=W.targetPos,dx=tp.x-car.x,dz=tp.z-car.z,d=Math.hypot(dx,dz);
   // 天線：車頭方向 (sin th, cos th) 和目標方向的夾角
   var c=d<0.01?1:(Math.sin(car.th)*dx+Math.cos(car.th)*dz)/d;
   var ant=Math.pow((1+c)/2,RADIO.antennaPow);ant=RADIO.antennaMin+(1-RADIO.antennaMin)*ant;
-  var rb=ridgeBlock(tp,d),hi=Math.max(0,groundH(car.x,car.z)-W.hBase);
+  var rp=radioRidge(),rb=ridgeBlock(tp,d,0,rp.ridgeFull),hi=Math.max(0,groundH(car.x,car.z)-W.hBase);
   var rng=RADIO.range*(1+RADIO.heightGain*hi);            // 站得高，收得遠
   var base=Math.pow(clamp(1-d/rng,0,1),RADIO.falloff);
   // 衰落：幾個慢速正弦疊起來的起伏；開車時全幅，停車時只剩 25%（RADIO.fadeAmp＝0 就不跳）
   var tt=simT,fn=(Math.sin(tt*2.1+1.1)+0.7*Math.sin(tt*4.7+2.7)+0.8*Math.sin(tt*0.8+0.3))/2.5;
   var fade=1+RADIO.fadeAmp*(0.25+0.75*clamp(Math.abs(car.v)/5,0,1))*fn;
-  var faint=RADIO.faintAmp*ant*(1-RADIO.ridgeLoss*rb)*clamp(1-d/(MAP_M*RADIO.faintRatio),0,1)*(0.6+0.4*fade);   // 遠處微弱的方向訊號
-  var sig=clamp(base*ant*(1-RADIO.ridgeLoss*rb)*fade+faint,0,1);
+  var faint=RADIO.faintAmp*ant*(1-rp.ridgeLoss*rb)*clamp(1-d/(MAP_M*RADIO.faintRatio),0,1)*(0.6+0.4*fade);   // 遠處微弱的方向訊號
+  var sig=clamp(base*ant*(1-rp.ridgeLoss*rb)*fade+faint,0,1);
   var antQ=(ant-RADIO.antennaMin)/(1-RADIO.antennaMin),hQ=clamp(hi/RADIO.clarHeightRef,0,1);
   var quality=RADIO.clarBase+RADIO.clarHeight*hQ+RADIO.clarAnt*antQ;
-  var clar=clamp(quality*(1-RADIO.clarRidge*rb)*(1-RADIO.clarDistW*clamp(d/(MAP_M*RADIO.clarDistRange),0,1))*1.08,0,1);
+  var clar=clamp(quality*(1-rp.clarRidge*rb)*(1-RADIO.clarDistW*clamp(d/(MAP_M*RADIO.clarDistRange),0,1))*1.08,0,1);
   RS.dist=d;RS.angCos=c;RS.antenna=ant;RS.ridge=rb;RS.high=hi;RS.sig=sig;RS.clar=clar;
 }
 // 「喀」：按下／放開通話鍵、靜噪打開的短促聲
